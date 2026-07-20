@@ -10,11 +10,21 @@ import androidx.compose.ui.unit.dp
 import com.nudge.app.ui.theme.NudgeTheme
 
 @Composable
-fun SummaryScreen() {
+fun SummaryScreen(onConnectWithPhysician: () -> Unit = {}) {
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp)
     ) {
         Text(text = "Summarized Data", style = MaterialTheme.typography.headlineMedium)
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Button(
+            onClick = onConnectWithPhysician,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Link a Physician/Therapist")
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
         
         Card(
