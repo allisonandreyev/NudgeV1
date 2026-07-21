@@ -18,8 +18,13 @@ import androidx.navigation.compose.rememberNavController
 import com.nudge.app.data.UserRole
 import com.nudge.app.ui.ConnectPhysicianScreen
 import com.nudge.app.ui.DeviceSelectScreen
+import com.nudge.app.ui.ForgotPasswordScreen
 import com.nudge.app.ui.LoginScreen
+import com.nudge.app.ui.MinigameScreen
+import com.nudge.app.ui.SignUpScreen
 import com.nudge.app.ui.SummaryScreen
+import com.nudge.app.ui.TherapySessionScreen
+import com.nudge.app.ui.WelcomeScreen
 import com.nudge.app.ui.theme.NudgeTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -45,23 +50,51 @@ fun NudgeApp() {
     val navController = rememberNavController()
     var userRole by remember { mutableStateOf<UserRole?>(null) }
 
-    NavHost(navController = navController, startDestination = "login") {
+    NavHost(navController = navController, startDestination = "welcome") {
+        composable("welcome") {
+            WelcomeScreen(
+                onNavigateToLogin = { navController.navigate("login") },
+                onNavigateToSignUp = { navController.navigate("signup") }
+            )
+        }
         composable("login") {
-            LoginScreen(onLoginSuccess = { role ->
-                userRole = role
-                navController.navigate("device_select")
-            })
+            LoginScreen(
+                onLoginSuccess = { role ->
+                    userRole = role
+                    navController.navigate("device_select")
+                },
+                onForgotPassword = { navController.navigate("forgot_password") }
+            )
+        }
+        composable("signup") {
+            SignUpScreen(onSignUpSuccess = { navController.navigate("login") })
+        }
+        composable("forgot_password") {
+            ForgotPasswordScreen(onResetSuccess = { navController.navigate("login") })
         }
         composable("device_select") {
             DeviceSelectScreen(onDeviceSelected = { deviceName ->
-                // TODO: Store selected device info
                 navController.navigate("summary")
             })
         }
         composable("summary") {
-            SummaryScreen(onConnectWithPhysician = {
-                navController.navigate("connect_physician")
-            })
+            SummaryScreen(
+                onConnectWithPhysician = {
+                    navController.navigate("connect_physician")
+                },
+                onStartTherapy = {
+                    navController.navigate("therapy")
+                },
+                onStartMinigame = {
+                    navController.navigate("minigame")
+                }
+            )
+        }
+        composable("therapy") {
+            TherapySessionScreen(onSessionEnd = { navController.popBackStack() })
+        }
+        composable("minigame") {
+            MinigameScreen(onGameEnd = { navController.popBackStack() })
         }
         composable("connect_physician") {
             ConnectPhysicianScreen(onConnectionSuccess = {

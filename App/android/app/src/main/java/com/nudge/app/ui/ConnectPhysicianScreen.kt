@@ -5,7 +5,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.nudge.app.ui.theme.NudgeTheme
 
 @Composable
 fun ConnectPhysicianScreen(onConnectionSuccess: () -> Unit) {
@@ -21,12 +23,14 @@ fun ConnectPhysicianScreen(onConnectionSuccess: () -> Unit) {
         if (!isSuccess) {
             Text(
                 text = "Connect with your Physician",
-                style = MaterialTheme.typography.headlineMedium
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = "Enter your physician's username or email to link your accounts.",
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
+                modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
 
             OutlinedTextField(
@@ -53,8 +57,6 @@ fun ConnectPhysicianScreen(onConnectionSuccess: () -> Unit) {
                     } else if (!identifier.contains("@") && identifier.length < 4) {
                         errorMessage = "Please enter a valid email or username"
                     } else {
-                        // Demo Logic: In a real app, this would check if the account is a Physician type via API
-                        // We simulate a check here
                         if (identifier.lowercase().contains("patient")) {
                             errorMessage = "Error: This account is not a Physician account."
                         } else {
@@ -83,5 +85,13 @@ fun ConnectPhysicianScreen(onConnectionSuccess: () -> Unit) {
                 Text("Back to Dashboard")
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ConnectPhysicianScreenPreview() {
+    NudgeTheme {
+        ConnectPhysicianScreen(onConnectionSuccess = {})
     }
 }
