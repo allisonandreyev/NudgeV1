@@ -1,9 +1,9 @@
 <component name="libraryTable">
   <library name="Gradle: androidx.compose.foundation:foundation-android:1.6.6@aar" external-system-id="GRADLE">
     <CLASSES>
-      <root url="file://$USER_HOME$/.gradle/caches/9.3.0/transforms/83b8289bf783ba6a027b08d2ba739fdf/workspace/transformed/jetified-foundation-release/AndroidManifest.xml" />
-      <root url="file://$USER_HOME$/.gradle/caches/9.3.0/transforms/83b8289bf783ba6a027b08d2ba739fdf/workspace/transformed/jetified-foundation-release/res" />
-      <root url="jar://$USER_HOME$/.gradle/caches/9.3.0/transforms/83b8289bf783ba6a027b08d2ba739fdf/workspace/transformed/jetified-foundation-release/jars/classes.jar!/" />
+      <root url="file://$USER_HOME$/.gradle/caches/9.3.0/transforms/af3d8f071ba88feb8e77763e6dab8c37/workspace/transformed/jetified-foundation-release/AndroidManifest.xml" />
+      <root url="file://$USER_HOME$/.gradle/caches/9.3.0/transforms/af3d8f071ba88feb8e77763e6dab8c37/workspace/transformed/jetified-foundation-release/res" />
+      <root url="jar://$USER_HOME$/.gradle/caches/9.3.0/transforms/af3d8f071ba88feb8e77763e6dab8c37/workspace/transformed/jetified-foundation-release/jars/classes.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES>

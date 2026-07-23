@@ -1,9 +1,9 @@
 <component name="libraryTable">
   <library name="Gradle: androidx.navigation:navigation-runtime-ktx:2.7.7@aar" external-system-id="GRADLE">
     <CLASSES>
-      <root url="file://$USER_HOME$/.gradle/caches/9.3.0/transforms/57f0ca930b5a4bcf0b9fe4a4aaaa84a6/workspace/transformed/navigation-runtime-ktx-2.7.7/AndroidManifest.xml" />
-      <root url="file://$USER_HOME$/.gradle/caches/9.3.0/transforms/57f0ca930b5a4bcf0b9fe4a4aaaa84a6/workspace/transformed/navigation-runtime-ktx-2.7.7/res" />
-      <root url="jar://$USER_HOME$/.gradle/caches/9.3.0/transforms/57f0ca930b5a4bcf0b9fe4a4aaaa84a6/workspace/transformed/navigation-runtime-ktx-2.7.7/jars/classes.jar!/" />
+      <root url="file://$USER_HOME$/.gradle/caches/9.3.0/transforms/26fe98c6f66b94f147a88eaa547d42a4/workspace/transformed/navigation-runtime-ktx-2.7.7/AndroidManifest.xml" />
+      <root url="file://$USER_HOME$/.gradle/caches/9.3.0/transforms/26fe98c6f66b94f147a88eaa547d42a4/workspace/transformed/navigation-runtime-ktx-2.7.7/res" />
+      <root url="jar://$USER_HOME$/.gradle/caches/9.3.0/transforms/26fe98c6f66b94f147a88eaa547d42a4/workspace/transformed/navigation-runtime-ktx-2.7.7/jars/classes.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES>
