@@ -21,12 +21,13 @@ struct CharacteristicInfo
 class BLE
 {
   private:
-    NimBLEServer* pServer;
-    NimBLEAdvertising* pAdvertising;
-    std::unordered_map<std::string, ServiceInfo> bleServices;
-    std::unordered_map<std::string, CharacteristicInfo> bleCharacteristics;
+    NimBLEServer* pServer; // Main BLE server. MUST BE ACTIVE TO WORK
+    NimBLEAdvertising* pAdvertising; // Global advertising service pointer
+    std::unordered_map<std::string, ServiceInfo> bleServices; // Storage of all services in memory
+    std::unordered_map<std::string, CharacteristicInfo> bleCharacteristics; // Storage of all characteristics in memory
 
   public:
+    // Constructor/deconstructor
     BLE();
     ~BLE()
     {
@@ -34,18 +35,20 @@ class BLE
       bleServices.clear();
     }
 
-    void Init();
-    bool UpdateClients();
-    NimBLEService* AddService(const char* name, const char* uuid);
-    NimBLECharacteristic* AddCharacteristic(const char* ServiceName, const char* CharacteristicName, const char* uuid, uint32_t Properties);
-    bool StartService(const char* name);
-    void StartAdvertising();
-    NimBLECharacteristic* GetCharacteristic(const char* uuid);
+    void Init(); // Initialize BLE syste,
+    bool UpdateClients(); // Send all characteristics (data)
+    NimBLEService* AddService(const char* name, const char* uuid); // Adds a service
+    NimBLECharacteristic* AddCharacteristic(const char* ServiceName, const char* CharacteristicName, const char* uuid, uint32_t Properties); // Adds a characteristic
+    bool StartService(const char* name); // Starts a service
+    void StartAdvertising(); // Starts advertising BLE connections and services
+    NimBLECharacteristic* GetCharacteristic(const char* name); // Get a NimBLE characteristic by name
 
+    // Sets the value of a characteristic
     bool SetValue(const char* name, String& data);
     bool SetValue(const char* name, const char* data);
     bool SetValue(const char* name, const uint8_t* data, size_t size);
     bool SetValue(const char* name, uint16_t data);
+    // Catch-all for bad data types. Sends data as raw binary bits
     template<typename T>
     bool SetValue(const char* name, const T& value)
     {

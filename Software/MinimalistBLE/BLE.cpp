@@ -3,33 +3,37 @@
 #include <unordered_map>
 #include <string>
 
+// Create BLE object. Ensure that all major pointers are at least initialized as null
 BLE::BLE() : pServer(nullptr), pAdvertising(nullptr)
 {
   Serial.println("BLE object created.");
 }
 
+// Initialize the BLE server
 void BLE::Init()
 {
-  // Get UUID
+  // Get board UUID
   uint64_t chipid = ESP.getEfuseMac();
   Serial.printf("Board UUID: %04X%08X\n", (uint16_t)(chipid >> 32), (uint32_t)chipid);
 
-   /** Initialize NimBLE and set the device name */
+  // Initialize NimBLE and set the device name
   NimBLEDevice::init("Nudge Arm");
   pServer = NimBLEDevice::createServer();
   Serial.printf("Beginning NimBLE Server\n");
   
-  /** Create an advertising instance and add the services to the advertised data */
+  // Set the advertising pointer and give it a broadcasted name
   pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->setName("Nudge Arm");
   pAdvertising->enableScanResponse(true);
 }
 
+// Update all characteristics that are currently active in the GATT database
 bool BLE::UpdateClients()
 {
+  // Check if a client is connected
   if (!pServer->getConnectedCount()) { Serial.println("No clients connected..."); return false; }
-  // Serial.println("Client connected. 'Sending' data (not really, I\'m lying).");
 
+  // Loop through all characteristics and send their data
   for(auto& it : bleCharacteristics)
   {
     it.second.characteristic->notify();
@@ -38,93 +42,111 @@ bool BLE::UpdateClients()
   return true;
 }
 
+// Adds a service to the GATT database and advertising service
 NimBLEService* BLE::AddService(const char* name, const char* uuid)
 {
+  // Ensure the server is initialized
   if (!pServer)
   {
     Serial.println("BLE not initialized.");
     return nullptr;
   }
 
+  // Ensure that the service does not already exist
   if (bleServices.count(name))
   {
     Serial.println("Service already exists.");
     return bleServices[name].service;
   }
 
+  // Create service in the GATT database and ensure it succeeds
   auto* service = pServer->createService(uuid);
-
   if(!service) { Serial.println("Failed to create service."); return nullptr; }
 
+  // Add the service to memory with a name reference
   bleServices[name] = { uuid, service };
 
+  // Add the service to the advertising list
   pAdvertising->addServiceUUID(service->getUUID());
   return service;
 }
 
+// Starts a service
 bool BLE::StartService(const char* name)
 {
+  // Look for the service and ensure that it exists
   auto it = bleServices.find(name);
-
   if (it == bleServices.end())
       return false;
 
+  // Start the service
   it->second.service->start();
   Serial.printf("Service '%s' successfully started.\n", name);
   return true;
 }
 
+// Add a characteristic to a service and the GATT database
 NimBLECharacteristic* BLE::AddCharacteristic(const char* ServiceName, const char* CharacteristicName, const char* uuid, uint32_t Properties)
 {
+  // Ensure the server is initialized
   if (!pServer)
   {
     Serial.println("BLE not initialized.");
     return nullptr;
   }
   
+  // Ensure that the target service exists
   auto service = bleServices.find(ServiceName);
   if(service == bleServices.end())
     return nullptr;
 
+  // Ensure that the characteristic does not already exist
   if (bleCharacteristics.count(CharacteristicName))
   {
     Serial.println("Characteristic already exists.");
     return bleCharacteristics[CharacteristicName].characteristic;
   }
 
-  // the only properties are )strangely) NIMBLE_PROPERTY::READ and NIMBLE_PROPERTY::WRITE. I expected more
+  /*
+    NimBLE Property List:
+      - NIMBLE_PROPERTY::READ
+      - NIMBLE_PROPERTY::WRITE
+      - NIMBLE_PROPERTY::NOTIFY
+  */
+  // Create the characteristic on a service in the GATT and ensure that it was created successfully
   auto* newCharacteristic = service->second.service->createCharacteristic(uuid, Properties);
-
   if(!newCharacteristic) { Serial.println("Failed to create characteristic."); return nullptr; }
 
+  // Add the characteristic to memory with name reeference
   bleCharacteristics[CharacteristicName] = { uuid, newCharacteristic };
-
   return newCharacteristic;
 }
 
+// Start the advertising service
 void BLE::StartAdvertising()
 {
+  // Ensure that the advertising service and main server exist, then start advertising
   if(!pAdvertising) { Serial.println("Advertising unavailable"); return; }
   pAdvertising->start();
   Serial.printf("Advertising Started\n");
 }
 
+// Returns a characteristic
 NimBLECharacteristic* BLE::GetCharacteristic(const char* name)
 {
-    auto it = bleCharacteristics.find(name);
+  // Check for the characteristic in memory
+  auto it = bleCharacteristics.find(name);
 
-    if (it == bleCharacteristics.end())
-        return nullptr;
+  // If the service or characteristic is no longer active, fail out ("deleted" characteristic)
+  if (it == bleCharacteristics.end())
+    return nullptr;
 
-    return it->second.characteristic;
+  // Return the found characteristic
+  return it->second.characteristic;
 }
 
-// void BLE::SetValue(NimBLECharacteristic* characteristic, const uint8_t* data, size_t size)
-// {
-//   characteristic->setValue(data, size);
-// }
-
-bool BLE::SetValue(const char* name, String& data) 
+/*  === Sets the value of a characteristic. There are multiple different datatypes, be careful which you use ===  */
+bool BLE::SetValue(const char* name, String& data) // Sends a string
 { 
   auto* c = GetCharacteristic(name);
   if(!c) return false;
@@ -132,7 +154,7 @@ bool BLE::SetValue(const char* name, String& data)
   c->setValue(data);
   return true; 
 }
-bool BLE::SetValue(const char* name, const char* data) 
+bool BLE::SetValue(const char* name, const char* data) // Sends a character array (another type of string)
 {
   auto* c = GetCharacteristic(name);
   if(!c) return false;
@@ -140,7 +162,7 @@ bool BLE::SetValue(const char* name, const char* data)
   c->setValue(data);
   return true; 
 }
-bool BLE::SetValue(const char* name, const uint8_t* data, size_t size) 
+bool BLE::SetValue(const char* name, const uint8_t* data, size_t size) // Sends a binary value (will be interpreted as hex)
 { 
   auto* c = GetCharacteristic(name);
   if(!c) return false;
@@ -148,7 +170,7 @@ bool BLE::SetValue(const char* name, const uint8_t* data, size_t size)
   c->setValue(data, size);
   return true; 
 }
-bool BLE::SetValue(const char* name, uint16_t data) 
+bool BLE::SetValue(const char* name, uint16_t data) // Sends an integer
 { 
   auto* c = GetCharacteristic(name);
   if(!c) return false;
@@ -158,38 +180,8 @@ bool BLE::SetValue(const char* name, uint16_t data)
 }
 
 
-/*
-void BLE::StartAllServices()
-{
-  for(auto& service : bleServices)
-  {
-    service.second->start();
-  }
-}
-*/
-
-// bool Notify(const char* uuid, const uint8* data, size_t length);
-
-  /*Set up data sending service and data channel*/
-  // pDataService = pServer->createService("12345678-1234-1234-1234-123456789ABC");
-
-  // pServoPosition = pDataService->createCharacteristic(
-  //         "87654321-4321-4321-4321-CBA987654321",
-  //         NIMBLE_PROPERTY::READ |
-  //         NIMBLE_PROPERTY::NOTIFY
-  //     );
-
-  // pDataService->start();
-
-
-      //uint16_t position = random(0, 271);
-    //pServoPosition->setValue((uint8_t *)&position, sizeof(position));
-
-    // String position = String(random(0, 271));
-    // pServoPosition->setValue(position.c_str());
-
-    // bool success = pServoPosition->notify();
-    // Serial.printf("Sent %s  notify=%d\n", position.c_str(), success);
-
-
-  // pAdvertising->addServiceUUID(pDataService->getUUID());
+// Random stuff I'm keeping for reference if I ever get confused
+//uint16_t position = random(0, 271);
+//pServoPosition->setValue((uint8_t *)&position, sizeof(position));
+// String position = String(random(0, 271));
+// pServoPosition->setValue(position.c_str());
