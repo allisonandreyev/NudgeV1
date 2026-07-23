@@ -2,6 +2,7 @@
 #include <NimBLEDevice.h>
 #include <unordered_map>
 #include <string>
+#include "./BLECallbacks.h"
 
 // Create BLE object. Ensure that all major pointers are at least initialized as null
 BLE::BLE() : pServer(nullptr), pAdvertising(nullptr)
@@ -110,8 +111,19 @@ NimBLECharacteristic* BLE::AddCharacteristic(const char* ServiceName, const char
   /*
     NimBLE Property List:
       - NIMBLE_PROPERTY::READ
+      - NIMBLE_PROPERTY::READ_ENC
+      - NIMBLE_PROPERTY::READ_AUTHEN
+      - NIMBLE_PROPERTY::READ_AUTHOR
       - NIMBLE_PROPERTY::WRITE
+      - NIMBLE_PROPERTY::WRITE_NR
+      - NIMBLE_PROPERTY::WRITE_ENC
+      - NIMBLE_PROPERTY::WRITE_AUTHEN
+      - NIMBLE_PROPERTY::WRITE_AUTHOR
+      - NIMBLE_PROPERTY::BROADCAST
       - NIMBLE_PROPERTY::NOTIFY
+      - NIMBLE_PROPERTY::INDICATE
+    DEFAULT:
+      - NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE
   */
   // Create the characteristic on a service in the GATT and ensure that it was created successfully
   auto* newCharacteristic = service->second.service->createCharacteristic(uuid, Properties);
@@ -179,6 +191,27 @@ bool BLE::SetValue(const char* name, uint16_t data) // Sends an integer
   return true; 
 }
 
+// Adds a callback for any function to a NimBLE characteristic. It works, don't touch it
+void BLE::SetCallbacks(const char* CharacteristicName, BLECallbackConfig config)
+{
+  // Ensure the characteristic exists
+  auto* characteristic = GetCharacteristic(CharacteristicName);
+  if(!characteristic)
+  {
+    Serial.println("Characteristic not found.");
+    return;
+  }
+
+  // Create the callback object and add it to memory
+  auto* callback = new BLECharacteristicCallbackHandler(config);
+  Callbacks.push_back(callback);
+
+  // Add the callback to the characteristic
+  characteristic->setCallbacks(callback);
+}
+
+// onConnect (NimBLEServer *pServer, NimBLEConnInfo &connInfo)
+// onDisconnect (NimBLEServer *pServer, NimBLEConnInfo &connInfo, int reason)
 
 // Random stuff I'm keeping for reference if I ever get confused
 //uint16_t position = random(0, 271);
