@@ -19,17 +19,20 @@ Byte 6+: Payload - TLV structure
 enum class TypeCode : uint16_t
 {
   Int8     = 0x1111,
-  UInt8    = 0x1114,
-
   Int16    = 0x1112,
-  UInt16   = 0x1115,
-
   Int32    = 0x1113,
-  UInt32   = 0x1116,
+  Int64    = 0x1114,
+
+  UInt8    = 0x1115,
+  UInt16   = 0x1116,
+  UInt32   = 0x1117,
+  UInt64   = 0x1118,
 
   Bool     = 0x1120,
   Float    = 0x1130,
-  String   = 0x1140,
+  Double   = 0x1140,
+
+  String   = 0x1150,
   Raw      = 0x11FF,
 };
 
@@ -79,15 +82,18 @@ class Packet
     template<typename T>
     TypeCode GetType()
     {
-      if constexpr (std::is_same_v<T, int8_t>) return TypeCode::Int8;
-      else if constexpr (std::is_same_v<T, int16_t>) return TypeCode::Int16;
-      else if constexpr (std::is_same_v<T, int32_t>) return TypeCode::Int32;
-      else if constexpr (std::is_same_v<T, bool>) return TypeCode::Bool;
-      else if constexpr (std::is_same_v<T, float>) return TypeCode::Float;
-      else if constexpr (std::is_same_v<T, uint8_t>) return TypeCode::UInt8;
-      else if constexpr (std::is_same_v<T, uint16_t>) return TypeCode::UInt16;
-      else if constexpr (std::is_same_v<T, uint32_t>) return TypeCode::UInt32;
-      // else if constexpr (std::is_same_v<T, std::string>) return TypeCode::String;
+      if constexpr        (std::is_same_v<T, int8_t>)       return TypeCode::Int8;
+      else if constexpr   (std::is_same_v<T, int16_t>)      return TypeCode::Int16;
+      else if constexpr   (std::is_same_v<T, int32_t>)      return TypeCode::Int32;
+      else if constexpr   (std::is_same_v<T, int64_t>)      return TypeCode::Int64;
+      else if constexpr   (std::is_same_v<T, uint8_t>)      return TypeCode::UInt8;
+      else if constexpr   (std::is_same_v<T, uint16_t>)     return TypeCode::UInt16;
+      else if constexpr   (std::is_same_v<T, uint32_t>)     return TypeCode::UInt32;
+      else if constexpr   (std::is_same_v<T, uint64_t>)     return TypeCode::UInt64;
+      else if constexpr   (std::is_same_v<T, bool>)         return TypeCode::Bool;
+      else if constexpr   (std::is_same_v<T, float>)        return TypeCode::Float;
+      else if constexpr   (std::is_same_v<T, double>)       return TypeCode::Double;
+      else if constexpr   (std::is_same_v<T, std::string>)  return TypeCode::String;
       else return TypeCode::Raw;
     }
 };
