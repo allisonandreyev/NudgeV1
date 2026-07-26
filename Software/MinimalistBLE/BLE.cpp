@@ -20,6 +20,7 @@ void BLE::Init()
   // Initialize NimBLE and set the device name
   NimBLEDevice::init("Nudge Arm");
   pServer = NimBLEDevice::createServer();
+  pServer->setCallbacks(new BLEServerCallbackHandler());
   Serial.printf("Beginning NimBLE Server\n");
   
   // Set the advertising pointer and give it a broadcasted name
@@ -192,7 +193,7 @@ bool BLE::SetValue(const char* name, uint16_t data) // Sends an integer
 }
 
 // Adds a callback for any function to a NimBLE characteristic. It works, don't touch it
-void BLE::SetCallbacks(const char* CharacteristicName, BLECallbackConfig config)
+void BLE::SetCallbacks(const char* CharacteristicName, BLECharacteristicCallbackConfig config)
 {
   // Ensure the characteristic exists
   auto* characteristic = GetCharacteristic(CharacteristicName);

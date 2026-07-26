@@ -59,7 +59,7 @@ class BLE
     
     /* ==== GETTERS ==== */
     NimBLECharacteristic* GetCharacteristic(const char* name); // Get a NimBLE characteristic by name
-    void SetCallbacks(const char* CharacteristicName, BLECallbackConfig config); // Adds a callback to a characteristic channel
+    void SetCallbacks(const char* CharacteristicName, BLECharacteristicCallbackConfig config); // Adds a callback to a characteristic channel
 
     /* ==== DATA SETTERS ==== */
     bool SetValue(const char* name, String& data);

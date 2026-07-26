@@ -63,7 +63,7 @@ void setup(void)
       parse(message.c_str());
     }
   });
-
+  
   // Start required services
   ble.StartService("DataService");
   ble.StartAdvertising();
