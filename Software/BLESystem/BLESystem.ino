@@ -59,13 +59,6 @@ void PrintHex(const std::vector<uint8_t>& data)
   Serial.println();
 }
 
-int8_t a = -5;
-int16_t b = -1234;
-uint32_t c = 123456;
-float d = 3.14159;
-bool e = true;
-std::string f = "Hello BLE";
-
 void loop()
 {
   delay(10);
@@ -87,19 +80,14 @@ void loop()
   int16_t i16 = -32000;
   int32_t i32 = -2000000;
   int64_t i64 = -9000000000;
-
   uint8_t ui8 = 250;
   uint16_t ui16 = 60000;
   uint32_t ui32 = 4000000000;
   uint64_t ui64 = 900000000000;
-
   bool boolean = true;
-
   float floating = 3.14159f;
   double doub = 123.456;
-
   std::string text = "Hello from ESP32";
-
 
   p.Append(i8);
   p.Append(i16);
