@@ -15,7 +15,7 @@ void loop();
 void setup(void)
 {
   Serial.println("TESTING");
-  ble.Init("Custom BLE Device");
+  ble.Init("Advanced Packet v0.3.2");
 
   // Structure: BLE 5.3-DATA-MOVE-DEST-[UUID] (typically encoded in ascii)
   ble.AddService("TX", "000B1E53-D47A-CEDE-DE57-000000008488");
@@ -56,7 +56,7 @@ void loop()
   
   // std::string value = std::to_string(randvar);
   // ble.SetValue("SendEMGData", value.c_str());
-  ble.SetValue("SendEMGData", p.payloadData);
+  ble.SetValue("SendEMGData", p.Serialize());
   ble.UpdateClients();
 
   Serial.println("TESTING 2");
