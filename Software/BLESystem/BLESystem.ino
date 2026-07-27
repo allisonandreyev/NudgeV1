@@ -75,7 +75,7 @@ void loop()
 
   // p.Append(randvar);
   // p.Append(randvar2);
-
+  
   int8_t i8 = -42;
   int16_t i16 = -32000;
   int32_t i32 = -2000000;
@@ -89,22 +89,25 @@ void loop()
   double doub = 123.456;
   std::string text = "Hello from ESP32";
 
-  p.Append(i8);
-  p.Append(i16);
-  p.Append(i32);
-  p.Append(i64);
+  for(int i = 0; i < 7; i++)
+  {
+    p.Append(i8);
+    p.Append(i16);
+    p.Append(i32);
+    p.Append(i64);
 
-  p.Append(ui8);
-  p.Append(ui16);
-  p.Append(ui32);
-  p.Append(ui64);
+    p.Append(ui8);
+    p.Append(ui16);
+    p.Append(ui32);
+    p.Append(ui64);
 
-  p.Append(boolean);
+    p.Append(boolean);
 
-  p.Append(floating);
-  p.Append(doub);
+    p.Append(floating);
+    p.Append(doub);
 
-  p.Append(text);
+    p.Append(text);
+  }
   
   // std::string value = std::to_string(randvar);
   // ble.SetValue("SendEMGData", value.c_str());
