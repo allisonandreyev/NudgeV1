@@ -4,7 +4,7 @@
 #include <string>
 #include "./BLECallbacks.h"
 
-uint16_t BLE::MTU = 100;
+uint16_t BLE::MTU = 517;
 
 // Create BLE object. Ensure that all major pointers are at least initialized as null
 BLE::BLE() : pServer(nullptr), pAdvertising(nullptr), serverCallbacks(nullptr)
@@ -29,7 +29,7 @@ void BLE::Init(const char* name)
   NimBLEDevice::init(deviceName);
 
   // Set the highest MTU we can support
-  NimBLEDevice::setMTU(100);
+  NimBLEDevice::setMTU(517);
 
   // Create the server and set the device name
   pServer = NimBLEDevice::createServer();
