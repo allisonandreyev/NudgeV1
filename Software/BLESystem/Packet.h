@@ -36,6 +36,19 @@ enum class TypeCode : uint16_t
   Raw      = 0x11FF,
 };
 
+/*
+PACKET STRUCTURE
+Byte 0: Version
+Byte 1: Flags
+Byte 2: Message ID
+Byte 3: Segment Data
+  Bit 7-4: Total
+  Bit 3-0: Current
+Byte 4-5: Total Length (uint16_t)
+Byte 6+: Payload
+  Each different data chunk separated preceeded by its length
+*/
+
 class Packet
 {
   public:
@@ -65,10 +78,12 @@ class Packet
     void ClearData();
     // void AppendByte(const uint8_t*, size_t);
 
-    std::vector<uint8_t> Serialize();
+    std::vector<std::vector<uint8_t>> Serialize();
     // bool Deserialize(const uint8_t*, size_t);
 
   private:
+    size_t MTU; // negotiated at connect
+
     uint8_t version = 1;
     uint8_t flags = 0;
     uint8_t messageID = 0;
@@ -78,7 +93,7 @@ class Packet
     std::vector<uint8_t> payload; // split into 8 bit chunks to grow/shrink as needed
     
     void AppendType(TypeCode type);
-    void PrependHeader();
+    // void PrependHeader();
     template<typename T>
     TypeCode GetType()
     {

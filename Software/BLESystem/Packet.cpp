@@ -1,17 +1,17 @@
 #include "./Packet.h"
+#include "./BLE.h"
 #include <vector>
-#include "Packet.h"
 #include <type_traits>
 #include <unordered_map>
 
 Packet::Packet()
 {
-
+  
 }
 
 Packet::~Packet()
 {
-
+  payload.clear();
 }
 
 void Packet::SetVersion(uint8_t v) { version = v; }
@@ -31,33 +31,50 @@ void Packet::ClearData()
   payload.clear();
 }
 
-std::vector<uint8_t> Packet::Serialize()
+std::vector<std::vector<uint8_t>> Packet::Serialize()
 {
-  PrependHeader();
-  return payload;
-}
+  std::vector<std::vector<uint8_t>> packets;
 
-void Packet::PrependHeader()
-{
-  // insert header in reverse order to get the correct structure
-  // segment data will come later
+  MTU = BLE::GetMTU();
 
-  // Payload Length
-  uint16_t len = static_cast<uint16_t>(payload.size());
-  payload.insert(payload.begin(), static_cast<uint8_t>(len & 0xFF));
-  payload.insert(payload.begin(), static_cast<uint8_t>((len >> 8) & 0xFF));
+  if(MTU <= 9)
+  {
+    Serial.println("MTU too small");
+    return {};
+  }
 
-  // Segment data (just zeros for now)
-  payload.insert(payload.begin(), 0x00);
+  size_t maxPayload = MTU - 3 - 6; // Max Size - BLE overhead (3) - Packet Header (6)
+  size_t totalSegments = (payload.size() + maxPayload - 1) / maxPayload;
 
-  // Message ID
-  payload.insert(payload.begin(), messageID);
+  for(size_t i = 0; i < totalSegments; i++)
+  {
+    size_t start = i * maxPayload;
+    size_t end = std::min(start + maxPayload, payload.size());
 
-  // Flags
-  payload.insert(payload.begin(), flags);
+    std::vector<uint8_t> packet;
 
-  // Version
-  payload.insert(payload.begin(), version);
+    packet.push_back(version); // Version
+    packet.push_back(flags); // Flags
+    packet.push_back(messageID); // Message ID
+    
+    // Segment data
+    uint8_t segment = ((totalSegments & 0x0F) << 4) | (i & 0x0F); 
+    packet.push_back(segment);
+
+    // Payload Length
+    uint16_t len = payload.size();
+    packet.push_back(static_cast<uint8_t>((len >> 8) & 0xFF));
+    packet.push_back(static_cast<uint8_t>(len & 0xFF));
+
+    // Add the segment to the payload
+    packet.insert(packet.end(), payload.begin() + start, payload.begin() + end);
+
+    // Add the packet to the queue
+    packets.push_back(packet);
+  }
+
+  Serial.printf("Split packet into %u packets.\r\n", totalSegments);
+  return packets;
 }
 
 // bool Packet::Deserialize(const uint8_t*, size_t)

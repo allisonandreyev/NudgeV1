@@ -4,22 +4,10 @@
 #include <string>
 #include "./BLECallbacks.h"
 
-/*
-PACKET STRUCTURE
-Byte 0: Version
-Byte 1: Flags
-Byte 2: Message ID
-Byte 3: Segment Data
-  Bit 7-4: Total
-  Bit 3-0: Current
-Byte 4: Current Segment
-Byte 5-6: Total Length (uint16_t)
-Byte 7+: Payload
-  Each different data chunk separated preceeded by its length
-*/
+uint16_t BLE::MTU = 100;
 
 // Create BLE object. Ensure that all major pointers are at least initialized as null
-BLE::BLE() : pServer(nullptr), pAdvertising(nullptr)
+BLE::BLE() : pServer(nullptr), pAdvertising(nullptr), serverCallbacks(nullptr)
 {
   Serial.println("BLE object created.");
 }
@@ -35,13 +23,19 @@ void BLE::Init(const char* name)
 
   // Get board UUID
   uint64_t chipid = ESP.getEfuseMac();
-  Serial.printf("Board UUID: %04X%08X\n", (uint16_t)(chipid >> 32), (uint32_t)chipid);
+  Serial.printf("Board UUID: %04X%08X\r\n", (uint16_t)(chipid >> 32), (uint32_t)chipid);
 
-  // Initialize NimBLE and set the device name
+  // Initialize NimBLE
   NimBLEDevice::init(deviceName);
+
+  // Set the highest MTU we can support
+  NimBLEDevice::setMTU(100);
+
+  // Create the server and set the device name
   pServer = NimBLEDevice::createServer();
-  pServer->setCallbacks(new BLEServerCallbackHandler());
-  Serial.printf("Beginning NimBLE Server\n");
+  serverCallbacks = new BLEServerCallbackHandler();
+  pServer->setCallbacks(serverCallbacks);
+  Serial.printf("Beginning NimBLE Server\r\n");
   
   // Set the advertising pointer and give it a broadcasted name
   pAdvertising = NimBLEDevice::getAdvertising();
@@ -53,7 +47,7 @@ void BLE::Init(const char* name)
 bool BLE::UpdateClients()
 {
   // Check if a client is connected
-  if (!pServer->getConnectedCount()) { Serial.println("No clients connected..."); return false; }
+  // if (!pServer->getConnectedCount()) { Serial.println("No clients connected..."); return false; }
 
   // Loop through all characteristics and send their data
   for(auto& it : bleCharacteristics)
@@ -103,7 +97,7 @@ bool BLE::StartService(const char* name)
 
   // Start the service
   it->second.service->start();
-  Serial.printf("Service '%s' successfully started.\n", name);
+  Serial.printf("Service '%s' successfully started.\r\n", name);
   return true;
 }
 
@@ -161,7 +155,7 @@ void BLE::StartAdvertising()
   // Ensure that the advertising service and main server exist, then start advertising
   if(!pAdvertising) { Serial.println("Advertising unavailable"); return; }
   pAdvertising->start();
-  Serial.printf("Advertising Started\n");
+  Serial.printf("Advertising Started\r\n");
 }
 
 // Returns a characteristic

@@ -41,12 +41,15 @@ namespace PROP
 class BLE
 {
   private:
+    /* ==== VARIABLES ==== */
     NimBLEServer* pServer; // Main BLE server. MUST BE ACTIVE TO WORK
     NimBLEAdvertising* pAdvertising; // Global advertising service pointer
     std::unordered_map<std::string, ServiceInfo> bleServices; // Storage of all services in memory
     std::unordered_map<std::string, CharacteristicInfo> bleCharacteristics; // Storage of all characteristics in memory
     std::vector<BLECharacteristicCallbackHandler*> Callbacks; // Keeps track of all callbacks on all characteristics
+    BLEServerCallbackHandler* serverCallbacks;
     const char* deviceName = "Unnamed NimBLE Server";
+    static uint16_t MTU;
 
   public:
     /* ==== CONSTRUCTOR / DESTRUCTOR ==== */
@@ -79,6 +82,8 @@ class BLE
     /* ==== GETTERS ==== */
     NimBLECharacteristic* GetCharacteristic(const char* name); // Get a NimBLE characteristic by name
     void SetCallbacks(const char* CharacteristicName, BLECharacteristicCallbackConfig config); // Adds a callback to a characteristic channel
+    static uint16_t GetMTU() { return MTU; }
+    bool ClientConnected() { return (pServer->getConnectedCount() > 0); }
 
     /* ==== DATA SETTERS ==== */
     bool SetValue(const char* name, String& data);
@@ -90,5 +95,11 @@ class BLE
     bool SetValue(const char* name, const T& value)
     {
       return SetValue(name, reinterpret_cast<const uint8_t*>(&value), sizeof(T));
+    }
+
+    /* ==== SETTERS ==== */
+    static void SetMTU(uint16_t mtu)
+    {
+      MTU = mtu;
     }
 };
