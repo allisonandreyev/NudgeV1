@@ -1,47 +1,84 @@
-#define ACTIVE_SKETCH
-#if ACTIVE_SKETCH == 1
+#pragma once 
 #include <Arduino.h>
 #include <NimBLEDevice.h>
+#include "./BLE.h"
+#include "./BLECallbacks.h"
 
-static NimBLEServer* pServer
+BLE ble;
+
+void parse(const char* input)
+{
+  char cmd[32];
+
+  // Read just the command name first
+  if (sscanf(input, "%31s", cmd) != 1)
+    return;
+
+  if (strcmp(cmd, "SetServo") == 0)
+  {
+    int angle;
+
+    if (sscanf(input, "%*s %d", &angle) == 1)
+    {
+      if (angle >= 0 && angle <= 270)
+      {
+        Serial.printf("Servo = %d\n", angle);
+      }
+    }
+  }
+  else if (strcmp(cmd, "SendData") == 0)
+  {
+    char channel[64];
+    char data[128];
+
+    if (sscanf(input, "%*s \"%63[^\"]\" \"%127[^\"]\"", channel, data) == 2)
+    {
+      ble.SetValue(channel, data);
+    }
+  }
+}
 
 void setup(void)
 {
   Serial.begin(115200);
 
-  // Get UUID
-  uint64_t chipid = ESP.getEfuseMac();
-  Serial.printf("Board UUID: %04X%08X\n",
-                  (uint16_t)(chipid >> 32),
-                  (uint32_t)chipid);
-                  
-  Serial.printf("Beginning NimBLE Server\n");
+  // Set up BLE, advertising, a service, and a characteristic, then begin advertising them all
+  ble.Init();
+  ble.AddService("DataService", "12345678-1234-1234-1234-123456789ABC");
+  
+  // Add TX (RandomData) and RX (PhoneCmdLine) characteristics
+  ble.AddCharacteristic("DataService", "RandomData", "87654321-4321-4321-4321-CBA987654321", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  ble.AddCharacteristic("DataService", "PhoneCmdLine", "99999999-5555-4321-4321-CBA987654321", NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
+  ble.AddCharacteristic("DataService", "ManualLine", "D47A1143-5555-4321-4321-CBA987654321", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  
+  // Add an onWrite (when data is received from phone) callback
+  ble.SetCallbacks("PhoneCmdLine", 
+  {
+    .onWrite = [](auto* c, auto& info)
+    {
+      std::string message = c->getValue();
 
-  /** Initialize NimBLE and set the device name */
-  NimBLEDevice::init("Nudge Arm");
-
-  /** Create an advertising instance and add the services to the advertised data */
-  NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
-  pAdvertising->setName("Nudge Arm " + );
-
-  pAdvertising->enableScanResponse(true);
-  pAdvertising->start();
-
-  Serial.printf("Advertising Started\n");
+      Serial.print("Received: ");
+      Serial.println(message.c_str());
+      parse(message.c_str());
+    }
+  });
+  
+  // Start required services
+  ble.StartService("DataService");
+  ble.StartAdvertising();
 }
 
-void loop()
-{
-  /** Loop here and send notifications to connected peers */
+void loop() {
+  // Rate limiter to not burn out the clock chip
   delay(2000);
-  if (pServer->getConnectedCount()) {
-    // NimBLEService* pSvc = pServer->getServiceByUUID("BAAD");
-    // if (pSvc) {
-    //     NimBLECharacteristic* pChr = pSvc->getCharacteristic("F00D");
-    //     if (pChr) {
-    //         pChr->notify();
-    //     }
-    // }
-  }
+
+  // Generate random data and store it for transmission as a human readable string
+  uint8_t randvar = random(0, 100);
+  std::string value = std::to_string(randvar);
+  ble.SetValue("RandomData", value.c_str());
+
+  // Send all characteristics if a client is connected
+  if(ble.UpdateClients())
+    Serial.printf("Successfully sent data '%d'.\n", randvar);
 }
-#endif
