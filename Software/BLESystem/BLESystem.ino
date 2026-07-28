@@ -6,12 +6,12 @@
 #include <array>
 
 BLE ble;
-std::array<uint8_t, 506> data{};
+// std::array<uint8_t, 506> data{};
 
 void setup(void)
 {
   Serial.begin(115200);
-  ble.Init("Advanced Packet v0.8.3");
+  ble.Init("Advanced Packet v0.8.4");
 
   // Structure: BLE 5.3-DATA-MOVE-DEST-[UUID] (typically encoded in ascii)
   ble.AddService("TX", "000B1E53-D47A-CEDE-DE57-000000008488");
@@ -36,10 +36,10 @@ void setup(void)
   ble.StartService("RX");
   ble.StartAdvertising();
 
-  for(size_t i = 0; i < data.size(); i++)
-  {
-    data[i] = i & 0xFF;
-  }
+  // for(size_t i = 0; i < data.size(); i++)
+  // {
+  //   data[i] = i & 0xFF;
+  // }
 }
 
 uint8_t c = 0;
@@ -61,7 +61,7 @@ void PrintHex(const std::vector<uint8_t>& data)
 
 void loop()
 {
-  delay(10);
+  delay(5000);
 
   if (!ble.ClientConnected()) { Serial.println("No clients connected..."); return; }
   Serial.println("=============== NEW PACKET ===============");
@@ -89,32 +89,36 @@ void loop()
   double doub = 123.456;
   std::string text = "Hello from ESP32";
 
-  for(int i = 0; i < 7; i++)
+  for(int i = 0; i < 10; i++)
   {
-    p.Append(i8);
-    p.Append(i16);
-    p.Append(i32);
-    p.Append(i64);
+    // p.Append(i8);
+    // p.Append(i16);
+    // p.Append(i32);
+    // p.Append(i64);
 
-    p.Append(ui8);
-    p.Append(ui16);
-    p.Append(ui32);
-    p.Append(ui64);
+    // p.Append(ui8);
+    // p.Append(ui16);
+    // p.Append(ui32);
+    // p.Append(ui64);
 
-    p.Append(boolean);
+    // p.Append(boolean);
 
-    p.Append(floating);
+    // p.Append(floating);
     p.Append(doub);
 
-    p.Append(text);
+    // p.Append(text);
   }
+  
+  // p.Append(doub);
   
   // std::string value = std::to_string(randvar);
   // ble.SetValue("SendEMGData", value.c_str());
   auto packetQueue = p.Serialize();
 
+  int pp = 0;
   while(!packetQueue.empty() && ble.ClientConnected())
   {
+    Serial.printf("Fired pkt %d\r\n", pp);
     auto packet = packetQueue.front();
     Serial.printf("Sending %u bytes\r\n", packet.size());
     Serial.printf(
