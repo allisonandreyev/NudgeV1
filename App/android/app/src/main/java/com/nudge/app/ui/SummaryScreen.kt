@@ -1,147 +1,172 @@
 package com.nudge.app.ui
 
-import androidx.compose.foundation.Canvas
+import android.bluetooth.BluetoothProfile
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nudge.app.ui.theme.NudgeTheme
+import com.nudge.app.bluetooth.BluetoothViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SummaryScreen(
+    viewModel: BluetoothViewModel,
     onConnectWithPhysician: () -> Unit = {},
     onStartTherapy: () -> Unit = {},
     onStartMinigame: () -> Unit = {}
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "User Data",
-            style = MaterialTheme.typography.displayLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 32.dp),
-            color = MaterialTheme.colorScheme.onSurface
-        )
+    val emgData by viewModel.emgDataHistory.collectAsState()
+    val receiveRate by viewModel.receiveFrequency.collectAsState()
+    val rawLogs by viewModel.rawLogs.collectAsState()
+    val connectionState by viewModel.connectionState.collectAsState()
+    var commandText by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
 
-        // Bar Chart Card
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth().height(250.dp).padding(bottom = 24.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Recovery Progress (Bar Chart)", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.height(16.dp))
-                BarChart()
-            }
-        }
-
-        // Pie Chart Card
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth().height(300.dp).padding(bottom = 32.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Activity Distribution (Pie Chart)", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.height(16.dp))
-                PieChart()
-            }
-        }
-
-        // Quick Actions
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Button(
-                onClick = onStartTherapy,
-                modifier = Modifier.weight(1f).height(56.dp)
-            ) {
-                Text("Start Therapy")
-            }
-            Button(
-                onClick = onStartMinigame,
-                modifier = Modifier.weight(1f).height(56.dp)
-            ) {
-                Text("Play Minigame")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedButton(
-            onClick = onConnectWithPhysician,
-            modifier = Modifier.fillMaxWidth().height(56.dp)
-        ) {
-            Text("Link a Physician/Therapist")
+    // Auto-scroll to bottom when new logs arrive
+    LaunchedEffect(rawLogs.size) {
+        if (rawLogs.isNotEmpty()) {
+            listState.animateScrollToItem(rawLogs.size - 1)
         }
     }
-}
 
-@Composable
-fun BarChart() {
-    val barColors = listOf(Color(0xFF4285F4), Color(0xFF9B72F3), Color(0xFFF4B400), Color(0xFFFBBC04))
-    val values = listOf(0.7f, 0.5f, 0.9f, 0.3f)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { 
+                    Column {
+                        Text("ESP32 Debug Console", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text(
+                            text = when(connectionState) {
+                                BluetoothProfile.STATE_CONNECTED -> "Connected"
+                                BluetoothProfile.STATE_CONNECTING -> "Connecting..."
+                                else -> "Disconnected"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if(connectionState == BluetoothProfile.STATE_CONNECTED) Color.Green else Color.Red
+                        )
+                    }
+                },
+                actions = {
+                    Text(
+                        "%.1f Hz".format(receiveRate),
+                        modifier = Modifier.padding(end = 16.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            // Live EMG Graph Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .padding(bottom = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text("Live EMG Stream", style = MaterialTheme.typography.labelMedium)
+                    LineGraph(
+                        data = emgData,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
 
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val spacing = 40.dp.toPx()
-        val barWidth = (size.width - (spacing * (values.size + 1))) / values.size
-        
-        values.forEachIndexed { index, value ->
-            val left = spacing + (index * (barWidth + spacing))
-            val top = size.height * (1 - value)
+            // Command Input
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = commandText,
+                    onValueChange = { commandText = it },
+                    label = { Text("Send Command") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+                IconButton(
+                    onClick = {
+                        viewModel.sendCommand(commandText)
+                        commandText = ""
+                    },
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Icon(Icons.Default.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+
+            Text(
+                "RAW INCOMING DATA",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // Raw Logs Console
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                colors = CardDefaults.cardColors(containerColor = Color.Black)
+            ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp)
+                ) {
+                    if (rawLogs.isEmpty()) {
+                        item {
+                            Text(
+                                "No data received yet. Waiting for packets...",
+                                color = Color.Gray,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
+                    items(rawLogs) { log ->
+                        Text(
+                            text = "> $log",
+                            color = Color.Green,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                    }
+                }
+            }
             
-            drawRect(
-                color = barColors[index % barColors.size],
-                topLeft = Offset(left, top),
-                size = Size(barWidth, size.height - top)
-            )
+            Button(
+                onClick = { viewModel.disconnect() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("Disconnect")
+            }
         }
-    }
-}
-
-@Composable
-fun PieChart() {
-    val colors = listOf(Color(0xFF4285F4), Color(0xFF9B72F3), Color(0xFFF4B400), Color(0xFFFBBC04))
-    val angles = listOf(180f, 90f, 60f, 30f)
-
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        var startAngle = 0f
-        val canvasSize = size.minDimension * 0.8f
-        val topLeft = Offset((size.width - canvasSize) / 2, (size.height - canvasSize) / 2)
-
-        angles.forEachIndexed { index, angle ->
-            drawArc(
-                color = colors[index % colors.size],
-                startAngle = startAngle,
-                sweepAngle = angle,
-                useCenter = true,
-                topLeft = topLeft,
-                size = Size(canvasSize, canvasSize)
-            )
-            startAngle += angle
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun SummaryScreenPreview() {
-    NudgeTheme {
-        SummaryScreen()
     }
 }

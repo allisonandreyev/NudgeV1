@@ -75,6 +75,17 @@ class Packet
       payload.insert(payload.end(), ptr, ptr + len);
     }
 
+    void Append(const std::string& value)
+    {
+      AppendType(TypeCode::String);
+      uint16_t len = value.length();
+      payload.push_back(static_cast<uint8_t>(len >> 8));
+      payload.push_back(static_cast<uint8_t>(len));
+
+      const auto* ptr = reinterpret_cast<const uint8_t*>(value.c_str());
+      payload.insert(payload.end(), ptr, ptr + len);
+    }
+
     void ClearData();
     // void AppendByte(const uint8_t*, size_t);
 

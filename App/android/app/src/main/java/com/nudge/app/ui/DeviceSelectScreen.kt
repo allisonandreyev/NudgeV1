@@ -1,5 +1,8 @@
 package com.nudge.app.ui
 
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothProfile
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,19 +24,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nudge.app.bluetooth.BluetoothViewModel
 import com.nudge.app.ui.theme.NudgeTheme
 
+@SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeviceSelectScreen(onDeviceSelected: (String) -> Unit) {
-    val devices = remember {
-        mutableStateListOf(
-            "Nudge-ESP32C6-A1",
-            "Nudge-ESP32C6-B4",
-            "Nudge-Physio-01"
-        )
+fun DeviceSelectScreen(
+    viewModel: BluetoothViewModel,
+    onDeviceSelected: (BluetoothDevice) -> Unit
+) {
+    val devices by viewModel.discoveredDevices.collectAsState()
+    val connectionState by viewModel.connectionState.collectAsState()
+    var isScanning by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.startScanning()
+        isScanning = true
     }
-    var isScanning by remember { mutableStateOf(true) }
 
     // Pulsing animation for the Bluetooth icon
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -52,7 +60,10 @@ fun DeviceSelectScreen(onDeviceSelected: (String) -> Unit) {
             CenterAlignedTopAppBar(
                 title = { Text("Device Selection", fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(onClick = { /* Reset scan */ }) {
+                    IconButton(onClick = { 
+                        viewModel.startScanning()
+                        isScanning = true
+                    }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }
                 },
@@ -85,19 +96,23 @@ fun DeviceSelectScreen(onDeviceSelected: (String) -> Unit) {
                     modifier = Modifier
                         .size(48.dp)
                         .graphicsLayer(scaleX = scale, scaleY = scale),
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = if (connectionState == BluetoothProfile.STATE_CONNECTED) Color.Green else MaterialTheme.colorScheme.primary
                 )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = if (isScanning) "Scanning for Nudge Wearables..." else "Select your device",
+                text = when (connectionState) {
+                    BluetoothProfile.STATE_CONNECTED -> "Connected!"
+                    BluetoothProfile.STATE_CONNECTING -> "Connecting..."
+                    else -> if (isScanning) "Scanning for Nudge Wearables..." else "Select your device"
+                },
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            if (isScanning) {
+            if (isScanning && connectionState != BluetoothProfile.STATE_CONNECTED) {
                 LinearProgressIndicator(
                     modifier = Modifier
                         .padding(top = 16.dp, start = 48.dp, end = 48.dp)
@@ -123,6 +138,7 @@ fun DeviceSelectScreen(onDeviceSelected: (String) -> Unit) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .weight(1f)
                     .padding(horizontal = 16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -130,10 +146,10 @@ fun DeviceSelectScreen(onDeviceSelected: (String) -> Unit) {
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
             ) {
                 LazyColumn {
-                    items(devices) { deviceName ->
+                    items(devices) { device ->
                         ListItem(
-                            headlineContent = { Text(deviceName, fontWeight = FontWeight.SemiBold) },
-                            supportingContent = { Text("ESP32-C6 Chipset") },
+                            headlineContent = { Text(device.name ?: "Unknown Device", fontWeight = FontWeight.SemiBold) },
+                            supportingContent = { Text(device.address) },
                             leadingContent = {
                                 Icon(
                                     Icons.Default.Bluetooth,
@@ -144,10 +160,14 @@ fun DeviceSelectScreen(onDeviceSelected: (String) -> Unit) {
                             trailingContent = {
                                 Text("Connect", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                             },
-                            modifier = Modifier.clickable { onDeviceSelected(deviceName) },
+                            modifier = Modifier.clickable { 
+                                viewModel.stopScanning()
+                                isScanning = false
+                                onDeviceSelected(device)
+                            },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                         )
-                        if (deviceName != devices.last()) HorizontalDivider(
+                        HorizontalDivider(
                             modifier = Modifier.padding(horizontal = 16.dp),
                             thickness = 0.5.dp,
                             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
@@ -156,22 +176,12 @@ fun DeviceSelectScreen(onDeviceSelected: (String) -> Unit) {
                 }
             }
             
-            Spacer(modifier = Modifier.weight(1f))
-            
             Text(
                 text = "Ensure your Nudge device is powered on.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(vertical = 24.dp)
             )
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DeviceSelectScreenPreview() {
-    NudgeTheme {
-        DeviceSelectScreen(onDeviceSelected = {})
     }
 }

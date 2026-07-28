@@ -32,12 +32,6 @@ fun WelcomeScreen(
             modifier = Modifier.size(120.dp),
             tint = MaterialTheme.colorScheme.primary
         )
-        
-        Text(
-            text = "LOGO",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline
-        )
 
         Spacer(modifier = Modifier.height(48.dp))
 
