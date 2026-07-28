@@ -37,16 +37,13 @@ std::vector<std::vector<uint8_t>> Packet::Serialize()
 
   MTU = BLE::GetMTU();
 
-  if(MTU <= 9)
+  if(MTU <= 19)
   {
     Serial.println("MTU too small");
     return {};
   }
 
-  // Safety: Limit segment size to 240 bytes.
-  // This avoids physical packet drops on both the ESP32 and Android sides.
-  size_t maxPayload = 240;
-
+  size_t maxPayload = MTU - 3 - 6 - 10; // Max Size - BLE overhead (3) - Packet Header (6)
   size_t totalSegments = (payload.size() + maxPayload - 1) / maxPayload;
 
   for(size_t i = 0; i < totalSegments; i++)
@@ -61,8 +58,7 @@ std::vector<std::vector<uint8_t>> Packet::Serialize()
     packet.push_back(messageID); // Message ID
     
     // Segment data
-    // totalSegments is 1-based, currentSegment (i) is 0-based
-    uint8_t segment = ((totalSegments & 0x0F) << 4) | (i & 0x0F);
+    uint8_t segment = ((totalSegments & 0x0F) << 4) | (i & 0x0F); 
     packet.push_back(segment);
 
     // Payload Length
