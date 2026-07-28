@@ -37,13 +37,13 @@ std::vector<std::vector<uint8_t>> Packet::Serialize()
 
   MTU = BLE::GetMTU();
 
-  if(MTU <= 9)
+  if(MTU <= 19)
   {
     Serial.println("MTU too small");
     return {};
   }
 
-  size_t maxPayload = MTU - 3 - 6; // Max Size - BLE overhead (3) - Packet Header (6)
+  size_t maxPayload = MTU - 3 - 6 - 10; // Max Size - BLE overhead (3) - Packet Header (6)
   size_t totalSegments = (payload.size() + maxPayload - 1) / maxPayload;
 
   for(size_t i = 0; i < totalSegments; i++)

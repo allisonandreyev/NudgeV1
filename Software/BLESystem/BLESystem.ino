@@ -89,51 +89,43 @@ void loop()
   double doub = 123.456;
   std::string text = "Hello from ESP32";
 
-  for(int i = 0; i < 10; i++)
+  for(int i = 0; i < 1; i++)
   {
-    // p.Append(i8);
-    // p.Append(i16);
-    // p.Append(i32);
-    // p.Append(i64);
+    p.Append(i8);
+    p.Append(i16);
+    p.Append(i32);
+    p.Append(i64);
 
-    // p.Append(ui8);
-    // p.Append(ui16);
-    // p.Append(ui32);
-    // p.Append(ui64);
+    p.Append(ui8);
+    p.Append(ui16);
+    p.Append(ui32);
+    p.Append(ui64);
 
-    // p.Append(boolean);
+    p.Append(boolean);
 
-    // p.Append(floating);
+    p.Append(floating);
     p.Append(doub);
 
-    // p.Append(text);
+    p.Append(text);
   }
   
-  // p.Append(doub);
-  
-  // std::string value = std::to_string(randvar);
-  // ble.SetValue("SendEMGData", value.c_str());
   auto packetQueue = p.Serialize();
-
-  int pp = 0;
   while(!packetQueue.empty() && ble.ClientConnected())
   {
-    Serial.printf("Fired pkt %d\r\n", pp);
     auto packet = packetQueue.front();
     Serial.printf("Sending %u bytes\r\n", packet.size());
     Serial.printf(
       "Sending segment %d/%d size=%u\n",
-      packet[3] & 0x0F,
+      (packet[3] & 0x0F) + 1,
       packet[3] >> 4,
       packet.size()
     );
     ble.SetValue("SendEMGData", packet);
     ble.UpdateClients();
     PrintHex(packet);
-    delay(15);
+    delay(50);
     packetQueue.erase(packetQueue.begin());
   }
 
-  ble.UpdateClients();
   p.ClearData();
 }
