@@ -1,0 +1,9 @@
+{
+  "additionalFiles": "..\\..\\..",
+  "compiler.optimization_flags": "-Os",
+  "customBuildProperties": "",
+  "fqbn": "esp32:esp32:esp32_family",
+  "hardwareFolders": "C:\\Users\\veile\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\3.3.10,C:\\Users\\veile\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\3.3.10",
+  "otherLibrariesFolders": "C:\\Users\\veile\\OneDrive\\Documents\\Arduino\\libraries",
+  "sketchLocation": "C:\\Users\\veile\\Documents\\CPSE\\NudgeV1\\Software\\ServoController"
+}
