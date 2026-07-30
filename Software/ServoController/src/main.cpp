@@ -3,7 +3,7 @@
 #include <Adafruit_PWMServoDriver.h>
 
 // ============================================================
-// Configuration
+// USER CONFIGURATION
 // ============================================================
 
 #define PCA9685_ADDR 0x40
@@ -13,16 +13,18 @@
 
 #define PWM_FREQ 50
 
+// Servo calibration
 #define SERVO_MIN_US 500
 #define SERVO_MAX_US 2500
-#define SERVO_MAX_ANGLE 270
 
+#define SERVO_MAX_ANGLE 270
 #define SERVO_COUNT 16
 
+// Servo update rate
 #define SERVO_UPDATE_MS 10
 
 // ============================================================
-// PCA9685
+// Hardware
 // ============================================================
 
 Adafruit_PWMServoDriver pwm(PCA9685_ADDR);
@@ -31,203 +33,232 @@ Adafruit_PWMServoDriver pwm(PCA9685_ADDR);
 // FreeRTOS
 // ============================================================
 
-TaskHandle_t servoTaskHandle = nullptr;
-QueueHandle_t servoQueue = nullptr;
+TaskHandle_t servoTaskHandle;
+QueueHandle_t servoQueue;
+bool randomMode = false;
 
 // ============================================================
-// Servo Data Structures
+// Data Structures
 // ============================================================
 
 struct ServoCommand
 {
-    uint8_t id;
-    float targetAngle;
-    float speed; // degrees per update
+  uint8_t id;
+  float angle;
+  float speed;
 };
 
 struct ServoState
 {
-    float currentAngle;
-    float targetAngle;
-    float speed;
-    bool moving;
+  float current;
+  float target;
+  float speed;
+  bool moving;
 };
 
-ServoState servos[SERVO_COUNT];
+ServoState servo[SERVO_COUNT];
 
 // ============================================================
-// Utility Functions
+// PWM Conversion
 // ============================================================
 
-uint16_t microsecondsToTicks(uint16_t us)
+uint16_t microsecondsToTicks(float us) { return (uint32_t)(us * 4096.0 / 20000.0); }
+
+void writeServo(uint8_t id, float angle)
 {
-    return (uint32_t)us * 4096 / 20000;
-}
+  if (id >= SERVO_COUNT) return;
 
-void writeServo(uint8_t channel, float angle)
-{
-    angle = constrain(angle, 0.0f, (float)SERVO_MAX_ANGLE);
+  angle = constrain(angle, 0, SERVO_MAX_ANGLE);
+  float pulse = SERVO_MIN_US + ((SERVO_MAX_US - SERVO_MIN_US) * angle / SERVO_MAX_ANGLE);
 
-    uint16_t pulse = map(
-        (int)angle,
-        0,
-        SERVO_MAX_ANGLE,
-        SERVO_MIN_US,
-        SERVO_MAX_US);
-
-    pwm.setPWM(channel, 0, microsecondsToTicks(pulse));
+  pwm.setPWM(id, 0, microsecondsToTicks(pulse));
 }
 
 // ============================================================
-// Servo Task
+// Servo Manager Task
 // ============================================================
 
-void servoTask(void *pv)
+void servoTask(void *parameter)
 {
-    ServoCommand cmd;
+  ServoCommand cmd;
 
-    while (true)
+  while (true)
+  {
+    while (xQueueReceive(servoQueue, &cmd, 0) == pdTRUE)
     {
-        // Process all waiting commands
-        while (xQueueReceive(servoQueue, &cmd, 0) == pdTRUE)
+      if (cmd.id >= SERVO_COUNT) continue;
+
+      servo[cmd.id].target = constrain(
+        cmd.angle,
+        0,
+        SERVO_MAX_ANGLE
+      );
+
+      servo[cmd.id].speed = constrain(
+        cmd.speed,
+        1,
+        300
+      );
+
+      servo[cmd.id].moving = true;
+
+      Serial.printf(
+        "Servo %d -> %.1f degrees @ %.1f deg/sec\n",
+        cmd.id,
+        servo[cmd.id].target,
+        servo[cmd.id].speed
+      );
+    }
+
+    if (randomMode)
+    {
+      bool anyMoving = false;
+
+      for (int i = 0; i < SERVO_COUNT; i++)
+      {
+        if (servo[i].moving)
         {
-            if (cmd.id >= SERVO_COUNT)
-                continue;
-
-            servos[cmd.id].targetAngle =
-                constrain(cmd.targetAngle, 0.0f, (float)SERVO_MAX_ANGLE);
-
-            servos[cmd.id].speed =
-                max(0.1f, cmd.speed);
-
-            servos[cmd.id].moving = true;
-
-            Serial.printf(
-                "Servo %d -> %.1f deg @ %.1f deg/update\n",
-                cmd.id,
-                servos[cmd.id].targetAngle,
-                servos[cmd.id].speed);
+          anyMoving = true;
+          break;
         }
+      }
 
-        // Update every servo
+      if (!anyMoving)
+      {
         for (int i = 0; i < SERVO_COUNT; i++)
         {
-            ServoState &s = servos[i];
-
-            if (!s.moving)
-                continue;
-
-            float error = s.targetAngle - s.currentAngle;
-
-            if (fabs(error) <= s.speed)
-            {
-                s.currentAngle = s.targetAngle;
-                s.moving = false;
-            }
-            else if (error > 0)
-            {
-                s.currentAngle += s.speed;
-            }
-            else
-            {
-                s.currentAngle -= s.speed;
-            }
-
-            writeServo(i, s.currentAngle);
+          servo[i].target = random(0, 251);
+          servo[i].speed = random(50, 151);
+          servo[i].moving = true;
         }
-
-        vTaskDelay(pdMS_TO_TICKS(SERVO_UPDATE_MS));
+      }
     }
-}
-
-// ============================================================
-// Serial Parsing
-// ============================================================
-
-String serialBuffer;
-
-void printHelp()
-{
-    Serial.println();
-    Serial.println("Commands:");
-    Serial.println("--------------------------------------");
-    Serial.println("Servo <id> <angle> <speed>");
-    Serial.println("status");
-    Serial.println("help");
-    Serial.println();
-    Serial.println("Examples:");
-    Serial.println("Servo 0 180 2");
-    Serial.println("Servo 4 90 5");
-    Serial.println("Servo 15 270 10");
-    Serial.println();
-}
-
-void printStatus()
-{
-    Serial.println();
 
     for (int i = 0; i < SERVO_COUNT; i++)
     {
-        Serial.printf(
-            "Servo %2d : Current=%6.1f  Target=%6.1f  %s\n",
-            i,
-            servos[i].currentAngle,
-            servos[i].targetAngle,
-            servos[i].moving ? "Moving" : "Idle");
+
+      if (!servo[i].moving) continue;
+
+      float difference = servo[i].target - servo[i].current;
+      float movement = servo[i].speed * (SERVO_UPDATE_MS / 1000.0);
+
+      if (abs(difference) <= movement)
+      {
+        servo[i].current = servo[i].target;
+        servo[i].moving = false;
+      }
+      else if (difference > 0)
+      {
+        servo[i].current += movement;
+      }
+      else
+      {
+        servo[i].current -= movement;
+      }
+
+      writeServo(i, servo[i].current);
     }
 
+        vTaskDelay(
+            pdMS_TO_TICKS(SERVO_UPDATE_MS)
+        );
+    }
+}
+
+// ============================================================
+// Serial Commands
+// ============================================================
+
+String input;
+
+void help()
+{
+    Serial.println();
+    Serial.println("Commands:");
+    Serial.println("-----------------------------");
+    Serial.println("Servo <id> <angle> <speed>");
+    Serial.println("setpulse <id> <microseconds>");
+    Serial.println("status");
+    Serial.println("random");
+    Serial.println("stoprandom");
+    Serial.println("help");
+
+    Serial.println();
+    Serial.println("Examples:");
+    Serial.println("Servo 0 90 30");
+    Serial.println("Servo 1 270 20");
+    Serial.println("setpulse 0 1500");
     Serial.println();
 }
 
-void parseCommand(String line)
+void status()
 {
-    line.trim();
+  for (int i = 0; i < SERVO_COUNT; i++)
+  {
+    Serial.printf(
+      "%d: %.1f -> %.1f %s\n",
+      i,
+      servo[i].current,
+      servo[i].target,
+      servo[i].moving ? "MOVING" : "IDLE"
+    );
+  }
+}
 
-    if (line.length() == 0)
-        return;
+void parseCommand(String cmd)
+{
+  cmd.trim();
 
-    if (line.equalsIgnoreCase("help"))
-    {
-        printHelp();
-        return;
-    }
+  if (cmd.equalsIgnoreCase("help"))
+  {
+    help();
+    return;
+  }
 
-    if (line.equalsIgnoreCase("status"))
-    {
-        printStatus();
-        return;
-    }
+  if (cmd.equalsIgnoreCase("status"))
+  {
+    status();
+    return;
+  }
 
-    int id;
-    float angle;
-    float speed;
+  if (cmd.equalsIgnoreCase("random")) {
+    randomMode = true;
+    Serial.println("Random servo mode enabled");
+    return;
+  }
 
-    if (sscanf(line.c_str(), "Servo %d %f %f",
-               &id,
-               &angle,
-               &speed) == 3)
-    {
-        if (id < 0 || id >= SERVO_COUNT)
-        {
-            Serial.println("Invalid servo ID.");
-            return;
-        }
+  if (cmd.equalsIgnoreCase("stoprandom")) {
+    randomMode = false;
+    Serial.println("Random servo mode disabled");
+    return;
+  }
 
-        ServoCommand cmd;
+  int id;
+  float a;
+  float speed;
 
-        cmd.id = id;
-        cmd.targetAngle = angle;
-        cmd.speed = speed;
+  if (sscanf(cmd.c_str(), "Servo %d %f %f", &id, &a, &speed ) == 3)
+  {
+    ServoCommand c;
 
-        if (xQueueSend(servoQueue, &cmd, 0) != pdTRUE)
-        {
-            Serial.println("Servo queue full.");
-        }
+    c.id = id;
+    c.angle = a;
+    c.speed = speed;
 
-        return;
-    }
+    xQueueSend(servoQueue, &c, portMAX_DELAY);
+    return;
+  }
 
-    Serial.println("Unknown command. Type 'help'.");
+  int pulse;
+
+  if (sscanf(cmd.c_str(), "setpulse %d %d", &id, &pulse) == 2) {
+
+    pwm.setPWM(id, 0, microsecondsToTicks(pulse));
+    Serial.printf("Servo %d pulse %dus\n", id, pulse);
+    return;
+  }
+
+  Serial.println("Unknown command");
 }
 
 // ============================================================
@@ -237,6 +268,9 @@ void parseCommand(String line)
 void setup()
 {
     Serial.begin(115200);
+
+    randomSeed(analogRead(0));
+
     delay(1000);
 
     Wire.begin(I2C_SDA, I2C_SCL);
@@ -247,65 +281,51 @@ void setup()
 
     delay(20);
 
-    // Initialize servo states
     for (int i = 0; i < SERVO_COUNT; i++)
     {
-        servos[i].currentAngle = 0;
-        servos[i].targetAngle = 0;
-        servos[i].speed = 1;
-        servos[i].moving = false;
+      servo[i].current = 0;
+      servo[i].target = 0;
+      servo[i].speed = 30;
+      servo[i].moving = false;
 
-        writeServo(i, 0);
+      writeServo(i, 0);
     }
 
     servoQueue = xQueueCreate(20, sizeof(ServoCommand));
 
     xTaskCreate(
-        servoTask,
-        "ServoTask",
-        4096,
-        nullptr,
-        2,
-        &servoTaskHandle);
+      servoTask,
+      "ServoTask",
+      4096,
+      nullptr,
+      2,
+      &servoTaskHandle
+    );
 
-    Serial.println();
-    Serial.println("Servo Manager Started.");
-    printHelp();
+    Serial.println("Servo controller ready");
+    help();
 }
 
 // ============================================================
 // Main Loop
 // ============================================================
 
-void loop()
+void loop() 
 {
-    while (Serial.available())
+  while (Serial.available()) 
+  {
+    char c = Serial.read();
+
+    if (c == '\n') 
     {
-        char c = Serial.read();
-
-        if (c == '\n' || c == '\r')
-        {
-            if (serialBuffer.length())
-            {
-                parseCommand(serialBuffer);
-                serialBuffer = "";
-            }
-        }
-        else
-        {
-            serialBuffer += c;
-        }
+      parseCommand(input);
+      input = "";
     }
+    else 
+    {
+      input += c;
+    }
+  }
 
-    // Other work can be done here:
-    //
-    // - Read sensors
-    // - BLE
-    // - WiFi
-    // - CAN
-    // - IMU
-    // - EMG
-    // - etc.
-
-    delay(1);
+  delay(1);
 }
