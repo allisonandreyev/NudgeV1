@@ -1,7 +1,7 @@
 #include <Wire.h>
 #include <Adafruit_PWMServoDriver.h>
 
-#define PCA9685_ADDR 0x41
+#define PCA9685_ADDR 0x40
 #define SERVO_CHANNEL 0
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(PCA9685_ADDR);
@@ -18,7 +18,7 @@ uint16_t microsecondsToTicks(uint16_t us) {
   return (uint16_t)((us * 4096UL) / 20000UL);
 }
 
-void setServoAngle(int angle) {
+void setServoAngle(int servo, int angle) {
   uint16_t pulse = map(angle, 0, 270, SERVO_MIN, SERVO_MAX);
   uint16_t ticks = microsecondsToTicks(pulse);
 
@@ -29,7 +29,7 @@ void setServoAngle(int angle) {
   Serial.print(" us | PCA Tick: ");
   Serial.println(ticks);
 
-  pwm.setPWM(SERVO_CHANNEL, 0, ticks);
+  pwm.setPWM(servo, 0, ticks);
 }
 
 void setup() {
@@ -67,8 +67,12 @@ void loop() {
 
   Serial.println("\nSweeping 0 -> 270");
 
-  for (int angle = 0; angle <= 270; angle++) {
-    setServoAngle(angle);
+  for (int angle = 0; angle <= 360; angle++) {
+    setServoAngle(0, angle);
+    setServoAngle(4, angle);
+    setServoAngle(8, angle);
+    // setServoAngle(4, 270 - angle);
+    // setServoAngle(8, angle / 2);
     delay(10);
   }
 
@@ -78,8 +82,12 @@ void loop() {
 
   Serial.println("\nSweeping 270 -> 0");
 
-  for (int angle = 270; angle >= 0; angle--) {
-    setServoAngle(angle);
+  for (int angle = 360; angle >= 0; angle--) {
+    setServoAngle(0, angle);
+    setServoAngle(4, angle);
+    setServoAngle(8, angle);
+    // setServoAngle(4, - (angle - 270));
+    // setServoAngle(8, angle / 2);
     delay(10);
   }
 
