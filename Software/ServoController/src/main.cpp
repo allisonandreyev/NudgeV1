@@ -7,13 +7,10 @@
 
 void setup()
 {
-    Serial.begin(115200);
-
-    randomSeed(analogRead(0));
-
-    delay(1000);
-
-    ServoController::Init();
+  Serial.begin(115200);
+  randomSeed(analogRead(0));
+  delay(1000);
+  ServoController::Init();
 }
 
 // ============================================================

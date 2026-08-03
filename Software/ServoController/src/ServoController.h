@@ -37,27 +37,28 @@ struct ServoState
 
 class ServoController
 {
-    public:
-        ServoController();
-        ~ServoController();
-        static void Init();
-        static void ParseCommand(String cmd);
+  public:
+    ServoController();
+    ~ServoController();
+    static void Init();
+    static void ParseCommand(String cmd);
+    static void SetServo(uint8_t id, float angle, float speed);
 
-    private:
-        static ServoState servo[SERVO_COUNT];
-        static void ServoTask(void *parameter);
-        
-        // cmdline functions
-        static void Status();
-        static void Help();
-        static void WriteServo(uint8_t id, float angle);
+  private:
+    static ServoState servo[SERVO_COUNT];
+    static void ServoTask(void *parameter);
+    
+    // cmdline functions
+    static void Status();
+    static void Help();
+    static void WriteServo(uint8_t id, float angle);
 
-        // helper function
-        static uint16_t microsecondsToTicks(float us) { return (uint32_t)(us * 4096.0 / 20000.0); }
+    // helper function
+    static uint16_t microsecondsToTicks(float us) { return (uint32_t)(us * 4096.0 / 20000.0); }
 
-        // variables
-        static Adafruit_PWMServoDriver pwm;/// = PCA9685_ADDR;
-        static TaskHandle_t servoTaskHandle;
-        static QueueHandle_t servoQueue;
-        static bool randomMode;// = false;
+    // variables
+    static Adafruit_PWMServoDriver pwm;/// = PCA9685_ADDR;
+    static TaskHandle_t servoTaskHandle;
+    static QueueHandle_t servoQueue;
+    static bool randomMode;// = false;
 };

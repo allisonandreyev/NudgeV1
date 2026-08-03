@@ -83,41 +83,34 @@ void ServoController::ServoTask(void *parameter)
         servo[i].moving = false;
       }
       else if (difference > 0)
-      {
         servo[i].current += movement;
-      }
       else
-      {
         servo[i].current -= movement;
-      }
-
       WriteServo(i, servo[i].current);
     }
 
-        vTaskDelay(
-            pdMS_TO_TICKS(SERVO_UPDATE_MS)
-        );
-    }
+    vTaskDelay(pdMS_TO_TICKS(SERVO_UPDATE_MS));
+  }
 }
 
 void ServoController::Help()
 {
-    Serial.println();
-    Serial.println("Commands:");
-    Serial.println("-----------------------------");
-    Serial.println("Servo <id> <angle> <speed>");
-    Serial.println("setpulse <id> <microseconds>");
-    Serial.println("status");
-    Serial.println("random");
-    Serial.println("stoprandom");
-    Serial.println("help");
+  Serial.println();
+  Serial.println("Commands:");
+  Serial.println("-----------------------------");
+  Serial.println("Servo <id> <angle> <speed>");
+  Serial.println("setpulse <id> <microseconds>");
+  Serial.println("status");
+  Serial.println("random");
+  Serial.println("stoprandom");
+  Serial.println("help");
 
-    Serial.println();
-    Serial.println("Examples:");
-    Serial.println("Servo 0 90 30");
-    Serial.println("Servo 1 270 20");
-    Serial.println("setpulse 0 1500");
-    Serial.println();
+  Serial.println();
+  Serial.println("Examples:");
+  Serial.println("Servo 0 90 30");
+  Serial.println("Servo 1 270 20");
+  Serial.println("setpulse 0 1500");
+  Serial.println();
 }
 
 void ServoController::Status()
@@ -192,35 +185,45 @@ void ServoController::ParseCommand(String cmd)
 
 void ServoController::Init()
 {
-    Wire.begin(I2C_SDA, I2C_SCL);
+  Wire.begin(I2C_SDA, I2C_SCL);
 
-    pwm.begin();
-    pwm.setOscillatorFrequency(27000000);
-    pwm.setPWMFreq(PWM_FREQ);
+  pwm.begin();
+  pwm.setOscillatorFrequency(27000000);
+  pwm.setPWMFreq(PWM_FREQ);
 
-    delay(20);
+  delay(20);
 
-    for (int i = 0; i < SERVO_COUNT; i++)
-    {
-      servo[i].current = 0;
-      servo[i].target = 0;
-      servo[i].speed = 30;
-      servo[i].moving = false;
+  for (int i = 0; i < SERVO_COUNT; i++)
+  {
+    servo[i].current = 0;
+    servo[i].target = 0;
+    servo[i].speed = 30;
+    servo[i].moving = false;
 
-      WriteServo(i, 0);
-    }
+    WriteServo(i, 0);
+  }
 
-    servoQueue = xQueueCreate(20, sizeof(ServoCommand));
+  servoQueue = xQueueCreate(20, sizeof(ServoCommand));
 
-    xTaskCreate(
-      ServoTask,
-      "ServoTask",
-      4096,
-      nullptr,
-      2,
-      &servoTaskHandle
-    );
+  xTaskCreate(
+    ServoTask,
+    "ServoTask",
+    4096,
+    nullptr,
+    2,
+    &servoTaskHandle
+  );
 
-    Serial.println("Servo controller ready");
-    Help();
+  Serial.println("Servo controller ready");
+  Help();
+}
+
+void ServoController::SetServo(uint8_t id, float angle, float speed)
+{
+  ServoCommand c;
+  c.id = id;
+  c.angle = angle;
+  c.speed = speed;
+
+  xQueueSend(servoQueue, &c, portMAX_DELAY);
 }
