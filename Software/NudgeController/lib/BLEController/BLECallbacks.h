@@ -44,14 +44,7 @@ class BLECharacteristicCallbackHandler : public NimBLECharacteristicCallbacks
 class BLEServerCallbackHandler : public NimBLEServerCallbacks
 {
   public:
-    void onConnect(NimBLEServer*, NimBLEConnInfo&) override
-    {
-      Serial.println("BLE Client Connected");
-    }
-
-    void onDisconnect(NimBLEServer*, NimBLEConnInfo&, int reason) override
-    {
-      Serial.printf("BLE Client Disconnected (%d)\n", reason);
-      NimBLEDevice::startAdvertising();
-    }
+    void onConnect(NimBLEServer*, NimBLEConnInfo& info) override;
+    void onDisconnect(NimBLEServer*, NimBLEConnInfo&, int reason) override;
+    void onMTUChange(uint16_t mtu, NimBLEConnInfo& connInfo) override;
 };

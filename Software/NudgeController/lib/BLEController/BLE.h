@@ -21,14 +21,35 @@ struct CharacteristicInfo
 //might add std::string name to these in case I need to do comparisons or smth
 
 
+namespace PROP
+{
+  constexpr auto READ = NIMBLE_PROPERTY::READ;
+  constexpr auto READ_ENC = NIMBLE_PROPERTY::READ_ENC;
+  constexpr auto READ_AUTHEN = NIMBLE_PROPERTY::READ_AUTHEN;
+  constexpr auto READ_AUTHOR = NIMBLE_PROPERTY::READ_AUTHOR;
+  constexpr auto WRITE = NIMBLE_PROPERTY::WRITE;
+  constexpr auto WRITE_NR = NIMBLE_PROPERTY::WRITE_NR;
+  constexpr auto WRITE_ENC = NIMBLE_PROPERTY::WRITE_ENC;
+  constexpr auto WRITE_AUTHEN = NIMBLE_PROPERTY::WRITE_AUTHEN;
+  constexpr auto WRITE_AUTHOR = NIMBLE_PROPERTY::WRITE_AUTHOR;
+  constexpr auto BROADCAST = NIMBLE_PROPERTY::BROADCAST;
+  constexpr auto NOTIFY = NIMBLE_PROPERTY::NOTIFY;
+  constexpr auto INDICATE = NIMBLE_PROPERTY::INDICATE;
+}
+
+
 class BLE
 {
   private:
+    /* ==== VARIABLES ==== */
     NimBLEServer* pServer; // Main BLE server. MUST BE ACTIVE TO WORK
     NimBLEAdvertising* pAdvertising; // Global advertising service pointer
     std::unordered_map<std::string, ServiceInfo> bleServices; // Storage of all services in memory
     std::unordered_map<std::string, CharacteristicInfo> bleCharacteristics; // Storage of all characteristics in memory
     std::vector<BLECharacteristicCallbackHandler*> Callbacks; // Keeps track of all callbacks on all characteristics
+    BLEServerCallbackHandler* serverCallbacks;
+    const char* deviceName = "Unnamed NimBLE Server";
+    static uint16_t MTU;
 
   public:
     /* ==== CONSTRUCTOR / DESTRUCTOR ==== */
@@ -46,7 +67,8 @@ class BLE
     }
 
     /* ==== INITIALIZERS ==== */
-    void Init(); // Initialize BLE syste,
+    void Init(); // Initialize BLE system
+    void Init(const char* name); // Choose the devices name
     bool UpdateClients(); // Send all characteristics (data)
 
     /* ==== ADDERS ==== */
@@ -60,15 +82,24 @@ class BLE
     /* ==== GETTERS ==== */
     NimBLECharacteristic* GetCharacteristic(const char* name); // Get a NimBLE characteristic by name
     void SetCallbacks(const char* CharacteristicName, BLECharacteristicCallbackConfig config); // Adds a callback to a characteristic channel
+    static uint16_t GetMTU() { return MTU; }
+    bool ClientConnected() { return (pServer->getConnectedCount() > 0); }
 
     /* ==== DATA SETTERS ==== */
     bool SetValue(const char* name, String& data);
     bool SetValue(const char* name, const char* data);
     bool SetValue(const char* name, const uint8_t* data, size_t size);
+    bool SetValue(const char* name, const std::vector<uint8_t>& data);
     bool SetValue(const char* name, uint16_t data);
     template<typename T> /* Catch-all for unsupported data types. Sends data as raw binary bits */
     bool SetValue(const char* name, const T& value)
     {
       return SetValue(name, reinterpret_cast<const uint8_t*>(&value), sizeof(T));
+    }
+
+    /* ==== SETTERS ==== */
+    static void SetMTU(uint16_t mtu)
+    {
+      MTU = mtu;
     }
 };
