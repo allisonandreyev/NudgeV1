@@ -16,7 +16,8 @@ import com.nudge.app.ui.theme.NudgeTheme
 @Composable
 fun WelcomeScreen(
     onNavigateToLogin: () -> Unit,
-    onNavigateToSignUp: () -> Unit
+    onNavigateToSignUp: () -> Unit,
+    onNavigateToTestData: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -67,6 +68,19 @@ fun WelcomeScreen(
         ) {
             Text("sign-up button", fontSize = 18.sp)
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedButton(
+            onClick = onNavigateToTestData,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = MaterialTheme.shapes.medium,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+        ) {
+            Text("Test Mode (Data Console)", fontSize = 18.sp)
+        }
     }
 }
 
@@ -74,6 +88,6 @@ fun WelcomeScreen(
 @Composable
 fun WelcomeScreenPreview() {
     NudgeTheme {
-        WelcomeScreen(onNavigateToLogin = {}, onNavigateToSignUp = {})
+        WelcomeScreen(onNavigateToLogin = {}, onNavigateToSignUp = {}, onNavigateToTestData = {})
     }
 }

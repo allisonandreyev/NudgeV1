@@ -104,20 +104,33 @@ class BluetoothLeService : Service() {
     }
 
     fun sendMessage(data: ByteArray) {
-        val gatt = bluetoothGatt ?: return
+        val gatt = bluetoothGatt
+        if (gatt == null) {
+            Log.e("BLE", "Cannot send message: GATT is null")
+            return
+        }
+        
         val service = gatt.getService(SERVICE_RX_UUID)
-        val characteristic = service?.getCharacteristic(CHAR_RX_UUID)
+        if (service == null) {
+            Log.e("BLE", "RX Service not found: $SERVICE_RX_UUID")
+            return
+        }
+        
+        val characteristic = service.getCharacteristic(CHAR_RX_UUID)
         if (characteristic != null) {
+            Log.d("BLE", "Sending ${data.size} bytes to characteristic $CHAR_RX_UUID using WRITE_TYPE_DEFAULT")
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                gatt.writeCharacteristic(characteristic, data, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+                gatt.writeCharacteristic(characteristic, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
             } else {
                 @Suppress("DEPRECATION")
                 characteristic.value = data
                 @Suppress("DEPRECATION")
-                characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-                @Suppress("DEPRECATION")
-                gatt.writeCharacteristic(characteristic)
+                characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                val success = @Suppress("DEPRECATION") gatt.writeCharacteristic(characteristic)
+                Log.d("BLE", "writeCharacteristic success: $success")
             }
+        } else {
+            Log.e("BLE", "RX Characteristic not found: $CHAR_RX_UUID")
         }
     }
 
@@ -154,6 +167,13 @@ class BluetoothLeService : Service() {
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.i("BLE", "Services discovered successfully.")
+                gatt.services.forEach { service ->
+                    Log.d("BLE", "Discovered Service: ${service.uuid}")
+                    service.characteristics.forEach { char ->
+                        Log.d("BLE", "  - Characteristic: ${char.uuid}")
+                    }
+                }
+
                 val service = gatt.getService(SERVICE_TX_UUID)
                 if (service == null) {
                     Log.e("BLE", "TX Service not found! Looking for: $SERVICE_TX_UUID")
@@ -195,6 +215,14 @@ class BluetoothLeService : Service() {
                 Log.i("BLE", "Notification subscription CONFIRMED by hardware for ${descriptor.characteristic.uuid}")
             } else {
                 Log.e("BLE", "Notification subscription FAILED with status: $status")
+            }
+        }
+
+        override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.i("BLE", "Write SUCCESS to ${characteristic.uuid}")
+            } else {
+                Log.e("BLE", "Write FAILED to ${characteristic.uuid} with status: $status")
             }
         }
 

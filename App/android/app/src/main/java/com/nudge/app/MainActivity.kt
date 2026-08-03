@@ -86,7 +86,12 @@ fun NudgeApp() {
         composable("welcome") {
             WelcomeScreen(
                 onNavigateToLogin = { navController.navigate("login") },
-                onNavigateToSignUp = { navController.navigate("signup") }
+                onNavigateToSignUp = { navController.navigate("signup") },
+                onNavigateToTestData = {
+                    currentUsername = "test_user"
+                    userRole = UserRole.PATIENT
+                    navController.navigate("device_select")
+                }
             )
         }
         composable("login") {
