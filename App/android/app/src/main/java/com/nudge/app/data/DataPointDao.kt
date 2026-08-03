@@ -11,9 +11,9 @@ interface DataPointDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(dataPoint: DataPoint)
 
-    @Query("SELECT * FROM data_points ORDER BY timestamp DESC")
-    fun getAllDataPoints(): Flow<List<DataPoint>>
+    @Query("SELECT * FROM data_points WHERE username = :username ORDER BY timestamp DESC")
+    fun getAllDataPoints(username: String): Flow<List<DataPoint>>
 
-    @Query("SELECT * FROM data_points WHERE type = :type ORDER BY timestamp DESC")
-    fun getDataPointsByType(type: String): Flow<List<DataPoint>>
+    @Query("SELECT * FROM data_points WHERE username = :username AND type = :type ORDER BY timestamp DESC")
+    fun getDataPointsByType(username: String, type: String): Flow<List<DataPoint>>
 }

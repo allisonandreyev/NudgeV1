@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,14 +19,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nudge.app.bluetooth.BluetoothViewModel
+import com.nudge.app.data.UserRole
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SummaryScreen(
     viewModel: BluetoothViewModel,
+    userRole: UserRole,
+    username: String,
     onConnectWithPhysician: () -> Unit = {},
     onStartTherapy: () -> Unit = {},
-    onStartMinigame: () -> Unit = {}
+    onStartMinigame: () -> Unit = {},
+    onViewPhysicianDashboard: () -> Unit = {}
 ) {
     val emgData by viewModel.emgDataHistory.collectAsState()
     val receiveRate by viewModel.receiveFrequency.collectAsState()
@@ -46,25 +51,33 @@ fun SummaryScreen(
             TopAppBar(
                 title = { 
                     Column {
-                        Text("ESP32 Debug Console", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         Text(
-                            text = when(connectionState) {
-                                BluetoothProfile.STATE_CONNECTED -> "Connected"
-                                BluetoothProfile.STATE_CONNECTING -> "Connecting..."
-                                else -> "Disconnected"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if(connectionState == BluetoothProfile.STATE_CONNECTED) Color.Green else Color.Red
+                            text = if (userRole == UserRole.PATIENT) "ESP32 Debug Console" else "Clinical Hub",
+                            fontWeight = FontWeight.Bold, 
+                            fontSize = 18.sp
                         )
+                        if (userRole == UserRole.PATIENT) {
+                            Text(
+                                text = when(connectionState) {
+                                    BluetoothProfile.STATE_CONNECTED -> "Connected"
+                                    BluetoothProfile.STATE_CONNECTING -> "Connecting..."
+                                    else -> "Disconnected"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if(connectionState == BluetoothProfile.STATE_CONNECTED) Color.Green else Color.Red
+                            )
+                        }
                     }
                 },
                 actions = {
-                    Text(
-                        "%.1f Hz".format(receiveRate),
-                        modifier = Modifier.padding(end = 16.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    if (userRole == UserRole.PATIENT) {
+                        Text(
+                            "%.1f Hz".format(receiveRate),
+                            modifier = Modifier.padding(end = 16.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             )
         }
@@ -75,85 +88,158 @@ fun SummaryScreen(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            // Live EMG Graph Card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .padding(bottom = 16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(modifier = Modifier.padding(8.dp)) {
-                    Text("Live EMG Stream", style = MaterialTheme.typography.labelMedium)
-                    LineGraph(
-                        data = emgData,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
-
-            // Command Input
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = commandText,
-                    onValueChange = { commandText = it },
-                    label = { Text("Send Command") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
-                )
-                IconButton(
-                    onClick = {
-                        viewModel.sendCommand(commandText)
-                        commandText = ""
-                    },
-                    modifier = Modifier.padding(start = 8.dp)
-                ) {
-                    Icon(Icons.Default.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
-                }
-            }
-
-            Text(
-                "RAW INCOMING DATA",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            // Raw Logs Console
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                colors = CardDefaults.cardColors(containerColor = Color.Black)
-            ) {
-                LazyColumn(
-                    state = listState,
+            if (userRole == UserRole.PATIENT) {
+                // Live EMG Graph Card
+                Card(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(8.dp)
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    if (rawLogs.isEmpty()) {
-                        item {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("Live EMG Stream", style = MaterialTheme.typography.labelMedium)
+                        LineGraph(
+                            data = emgData,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+
+                // Command Input
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = commandText,
+                        onValueChange = { commandText = it },
+                        label = { Text("Send Command") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    IconButton(
+                        onClick = {
+                            viewModel.sendCommand(commandText)
+                            commandText = ""
+                        },
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+
+                Text(
+                    "RAW INCOMING DATA",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                // Raw Logs Console
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    colors = CardDefaults.cardColors(containerColor = Color.Black)
+                ) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(8.dp)
+                    ) {
+                        if (rawLogs.isEmpty()) {
+                            item {
+                                Text(
+                                    "No data received yet. Waiting for packets...",
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(8.dp)
+                                )
+                            }
+                        }
+                        items(rawLogs) { log ->
                             Text(
-                                "No data received yet. Waiting for packets...",
-                                color = Color.Gray,
-                                modifier = Modifier.padding(8.dp)
+                                text = "> $log",
+                                color = Color.Green,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(vertical = 2.dp)
                             )
                         }
                     }
-                    items(rawLogs) { log ->
-                        Text(
-                            text = "> $log",
-                            color = Color.Green,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(vertical = 2.dp)
+                }
+            } else {
+                // Physician Landing View
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(100.dp),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Welcome, Dr. $username",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Select 'View Patient Dashboard' below to manage your connections.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(16.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            }
+
+            // Navigation Buttons
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (userRole == UserRole.PATIENT) {
+                    Button(
+                        onClick = onStartTherapy,
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Text("Therapy", fontSize = 12.sp)
+                    }
+                    Button(
+                        onClick = onStartMinigame,
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Text("Game", fontSize = 12.sp)
+                    }
+                    Button(
+                        onClick = onConnectWithPhysician,
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Text("Physician", fontSize = 12.sp)
+                    }
+                } else {
+                    // Physician View
+                    Button(
+                        onClick = onViewPhysicianDashboard,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Text("View Patient Dashboard", fontSize = 16.sp)
                     }
                 }
             }

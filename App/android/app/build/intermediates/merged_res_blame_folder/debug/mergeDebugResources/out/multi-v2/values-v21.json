@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.nudge.app-mergeDebugResources-59:/values-v21/values-v21.xml",
+            "outputFile": "com.nudge.app-mergeDebugResources-61:/values-v21/values-v21.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Aditya\\.gradle\\caches\\9.3.0\\transforms\\ba8603a30122d5ae071d0cd64cd08062\\workspace\\transformed\\core-1.13.1\\res\\values-v21\\values-v21.xml",
+                    "source": "C:\\Users\\Aditya\\.gradle\\caches\\9.3.0\\transforms\\20835a33f207808a3f8bc55612961f4a\\workspace\\transformed\\core-1.13.1\\res\\values-v21\\values-v21.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,13",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4",

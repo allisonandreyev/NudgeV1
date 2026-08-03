@@ -1,6 +1,7 @@
 package com.nudge.app.bluetooth;
 
 import android.content.Context;
+import com.nudge.app.data.DataPointDao;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
 import dagger.internal.QualifierMetadata;
@@ -25,20 +26,25 @@ import javax.inject.Provider;
 public final class BluetoothViewModel_Factory implements Factory<BluetoothViewModel> {
   private final Provider<Context> contextProvider;
 
-  public BluetoothViewModel_Factory(Provider<Context> contextProvider) {
+  private final Provider<DataPointDao> dataPointDaoProvider;
+
+  public BluetoothViewModel_Factory(Provider<Context> contextProvider,
+      Provider<DataPointDao> dataPointDaoProvider) {
     this.contextProvider = contextProvider;
+    this.dataPointDaoProvider = dataPointDaoProvider;
   }
 
   @Override
   public BluetoothViewModel get() {
-    return newInstance(contextProvider.get());
+    return newInstance(contextProvider.get(), dataPointDaoProvider.get());
   }
 
-  public static BluetoothViewModel_Factory create(Provider<Context> contextProvider) {
-    return new BluetoothViewModel_Factory(contextProvider);
+  public static BluetoothViewModel_Factory create(Provider<Context> contextProvider,
+      Provider<DataPointDao> dataPointDaoProvider) {
+    return new BluetoothViewModel_Factory(contextProvider, dataPointDaoProvider);
   }
 
-  public static BluetoothViewModel newInstance(Context context) {
-    return new BluetoothViewModel(context);
+  public static BluetoothViewModel newInstance(Context context, DataPointDao dataPointDao) {
+    return new BluetoothViewModel(context, dataPointDao);
   }
 }

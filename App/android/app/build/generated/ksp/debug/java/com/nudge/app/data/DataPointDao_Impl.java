@@ -37,16 +37,19 @@ public final class DataPointDao_Impl implements DataPointDao {
       @Override
       @NonNull
       protected String createQuery() {
-        return "INSERT OR REPLACE INTO `data_points` (`id`,`timestamp`,`value`,`type`) VALUES (nullif(?, 0),?,?,?)";
+        return "INSERT OR REPLACE INTO `data_points` (`id`,`username`,`timestamp`,`value`,`type`,`isSynced`) VALUES (nullif(?, 0),?,?,?,?,?)";
       }
 
       @Override
       protected void bind(@NonNull final SupportSQLiteStatement statement,
           @NonNull final DataPoint entity) {
         statement.bindLong(1, entity.getId());
-        statement.bindLong(2, entity.getTimestamp());
-        statement.bindDouble(3, entity.getValue());
-        statement.bindString(4, entity.getType());
+        statement.bindString(2, entity.getUsername());
+        statement.bindLong(3, entity.getTimestamp());
+        statement.bindDouble(4, entity.getValue());
+        statement.bindString(5, entity.getType());
+        final int _tmp = entity.isSynced() ? 1 : 0;
+        statement.bindLong(6, _tmp);
       }
     };
   }
@@ -70,9 +73,11 @@ public final class DataPointDao_Impl implements DataPointDao {
   }
 
   @Override
-  public Flow<List<DataPoint>> getAllDataPoints() {
-    final String _sql = "SELECT * FROM data_points ORDER BY timestamp DESC";
-    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
+  public Flow<List<DataPoint>> getAllDataPoints(final String username) {
+    final String _sql = "SELECT * FROM data_points WHERE username = ? ORDER BY timestamp DESC";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
+    int _argIndex = 1;
+    _statement.bindString(_argIndex, username);
     return CoroutinesRoom.createFlow(__db, false, new String[] {"data_points"}, new Callable<List<DataPoint>>() {
       @Override
       @NonNull
@@ -80,21 +85,29 @@ public final class DataPointDao_Impl implements DataPointDao {
         final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
         try {
           final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfUsername = CursorUtil.getColumnIndexOrThrow(_cursor, "username");
           final int _cursorIndexOfTimestamp = CursorUtil.getColumnIndexOrThrow(_cursor, "timestamp");
           final int _cursorIndexOfValue = CursorUtil.getColumnIndexOrThrow(_cursor, "value");
           final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
+          final int _cursorIndexOfIsSynced = CursorUtil.getColumnIndexOrThrow(_cursor, "isSynced");
           final List<DataPoint> _result = new ArrayList<DataPoint>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final DataPoint _item;
             final long _tmpId;
             _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final String _tmpUsername;
+            _tmpUsername = _cursor.getString(_cursorIndexOfUsername);
             final long _tmpTimestamp;
             _tmpTimestamp = _cursor.getLong(_cursorIndexOfTimestamp);
             final float _tmpValue;
             _tmpValue = _cursor.getFloat(_cursorIndexOfValue);
             final String _tmpType;
             _tmpType = _cursor.getString(_cursorIndexOfType);
-            _item = new DataPoint(_tmpId,_tmpTimestamp,_tmpValue,_tmpType);
+            final boolean _tmpIsSynced;
+            final int _tmp;
+            _tmp = _cursor.getInt(_cursorIndexOfIsSynced);
+            _tmpIsSynced = _tmp != 0;
+            _item = new DataPoint(_tmpId,_tmpUsername,_tmpTimestamp,_tmpValue,_tmpType,_tmpIsSynced);
             _result.add(_item);
           }
           return _result;
@@ -111,10 +124,12 @@ public final class DataPointDao_Impl implements DataPointDao {
   }
 
   @Override
-  public Flow<List<DataPoint>> getDataPointsByType(final String type) {
-    final String _sql = "SELECT * FROM data_points WHERE type = ? ORDER BY timestamp DESC";
-    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
+  public Flow<List<DataPoint>> getDataPointsByType(final String username, final String type) {
+    final String _sql = "SELECT * FROM data_points WHERE username = ? AND type = ? ORDER BY timestamp DESC";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 2);
     int _argIndex = 1;
+    _statement.bindString(_argIndex, username);
+    _argIndex = 2;
     _statement.bindString(_argIndex, type);
     return CoroutinesRoom.createFlow(__db, false, new String[] {"data_points"}, new Callable<List<DataPoint>>() {
       @Override
@@ -123,21 +138,29 @@ public final class DataPointDao_Impl implements DataPointDao {
         final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
         try {
           final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfUsername = CursorUtil.getColumnIndexOrThrow(_cursor, "username");
           final int _cursorIndexOfTimestamp = CursorUtil.getColumnIndexOrThrow(_cursor, "timestamp");
           final int _cursorIndexOfValue = CursorUtil.getColumnIndexOrThrow(_cursor, "value");
           final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
+          final int _cursorIndexOfIsSynced = CursorUtil.getColumnIndexOrThrow(_cursor, "isSynced");
           final List<DataPoint> _result = new ArrayList<DataPoint>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final DataPoint _item;
             final long _tmpId;
             _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final String _tmpUsername;
+            _tmpUsername = _cursor.getString(_cursorIndexOfUsername);
             final long _tmpTimestamp;
             _tmpTimestamp = _cursor.getLong(_cursorIndexOfTimestamp);
             final float _tmpValue;
             _tmpValue = _cursor.getFloat(_cursorIndexOfValue);
             final String _tmpType;
             _tmpType = _cursor.getString(_cursorIndexOfType);
-            _item = new DataPoint(_tmpId,_tmpTimestamp,_tmpValue,_tmpType);
+            final boolean _tmpIsSynced;
+            final int _tmp;
+            _tmp = _cursor.getInt(_cursorIndexOfIsSynced);
+            _tmpIsSynced = _tmp != 0;
+            _item = new DataPoint(_tmpId,_tmpUsername,_tmpTimestamp,_tmpValue,_tmpType,_tmpIsSynced);
             _result.add(_item);
           }
           return _result;

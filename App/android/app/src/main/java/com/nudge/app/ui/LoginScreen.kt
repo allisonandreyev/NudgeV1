@@ -16,19 +16,37 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.nudge.app.data.UserRole
 import com.nudge.app.ui.theme.NudgeTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (UserRole) -> Unit,
-    onForgotPassword: () -> Unit
+    onLoginSuccess: (String, UserRole) -> Unit,
+    onForgotPassword: () -> Unit,
+    viewModel: AuthViewModel = hiltViewModel()
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var selectedRole by remember { mutableStateOf(UserRole.PATIENT) }
+    
+    val authState by viewModel.authState.collectAsState()
+
+    LaunchedEffect(authState) {
+        when (val result = authState) {
+            is AuthResult.Success -> {
+                onLoginSuccess(result.username, result.role)
+                viewModel.resetAuthState()
+            }
+            is AuthResult.Error -> {
+                errorMessage = result.message
+                viewModel.resetAuthState()
+            }
+            else -> {}
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -135,7 +153,7 @@ fun LoginScreen(
                 if (username.isBlank() || password.isBlank()) {
                     errorMessage = "Please enter your credentials"
                 } else {
-                    onLoginSuccess(selectedRole)
+                    viewModel.login(username, password, selectedRole)
                 }
             },
             modifier = Modifier
@@ -160,6 +178,6 @@ fun LoginScreen(
 @Composable
 fun LoginScreenPreview() {
     NudgeTheme {
-        LoginScreen(onLoginSuccess = {}, onForgotPassword = {})
+        LoginScreen(onLoginSuccess = { _, _ -> }, onForgotPassword = {})
     }
 }

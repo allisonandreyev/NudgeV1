@@ -10,6 +10,8 @@ import android.os.IBinder
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nudge.app.data.DataPoint
+import com.nudge.app.data.DataPointDao
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
@@ -19,12 +21,15 @@ import javax.inject.Inject
 
 @HiltViewModel
 class BluetoothViewModel @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val dataPointDao: DataPointDao
 ) : ViewModel() {
 
     private var bluetoothService: BluetoothLeService? = null
     private var isBound = false
     private var collectionJob: Job? = null
+
+    private val _currentUsername = MutableStateFlow<String?>(null)
 
     private val _discoveredDevices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
     val discoveredDevices = _discoveredDevices.asStateFlow()
@@ -81,6 +86,10 @@ class BluetoothViewModel @Inject constructor(
         context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
+    fun setCurrentUser(username: String) {
+        _currentUsername.value = username
+    }
+
     private fun handlePacket(packet: Packet) {
         if (packet.messageId == lastMessageId) {
             Log.d("BluetoothViewModel", "Ignoring duplicate packet: msgId=${packet.messageId}")
@@ -118,6 +127,21 @@ class BluetoothViewModel @Inject constructor(
             }
             if (floatValue != null) {
                 _emgDataHistory.update { (it + floatValue).takeLast(100) }
+                
+                // Persist to database
+                val username = _currentUsername.value
+                if (username != null) {
+                    viewModelScope.launch {
+                        dataPointDao.insert(
+                            DataPoint(
+                                username = username,
+                                timestamp = System.currentTimeMillis(),
+                                value = floatValue,
+                                type = "EMG"
+                            )
+                        )
+                    }
+                }
             }
         }
     }

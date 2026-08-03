@@ -32,7 +32,8 @@ import com.nudge.app.ui.theme.NudgeTheme
 @Composable
 fun DeviceSelectScreen(
     viewModel: BluetoothViewModel,
-    onDeviceSelected: (BluetoothDevice) -> Unit
+    onDeviceSelected: (BluetoothDevice) -> Unit,
+    onSkipConnection: () -> Unit
 ) {
     val devices by viewModel.discoveredDevices.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
@@ -180,8 +181,15 @@ fun DeviceSelectScreen(
                 text = "Ensure your Nudge device is powered on.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                modifier = Modifier.padding(vertical = 24.dp)
+                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
             )
+
+            TextButton(
+                onClick = onSkipConnection,
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                Text("Skip for now", color = MaterialTheme.colorScheme.primary)
+            }
         }
     }
 }

@@ -53,6 +53,9 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
@@ -80,6 +83,9 @@ dependencies {
 
     // Security
     implementation(libs.androidx.security.crypto)
+    implementation(libs.jbcrypt)
+    implementation("net.zetetic:sqlcipher-android:4.6.1@aar")
+    implementation(libs.sqlite.ktx)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -13,6 +13,8 @@ hilt = "2.51.1"
 hiltNavigationCompose = "1.2.0"
 ksp = "1.9.23-1.0.20"
 security-crypto = "1.1.0"
+jbcrypt = "0.4"
+sqlcipher = "4.6.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -34,6 +36,10 @@ androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navig
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+room-paging = { group = "androidx.room", name = "room-paging", version.ref = "room" }
+jbcrypt = { group = "org.mindrot", name = "jbcrypt", version.ref = "jbcrypt" }
+sqlcipher = { group = "net.zetetic", name = "android-database-sqlcipher", version.ref = "sqlcipher" }
+sqlite-ktx = { group = "androidx.sqlite", name = "sqlite-ktx", version = "2.4.0" }
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "security-crypto" }

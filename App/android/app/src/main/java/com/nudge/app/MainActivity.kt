@@ -28,6 +28,8 @@ import com.nudge.app.ui.DeviceSelectScreen
 import com.nudge.app.ui.ForgotPasswordScreen
 import com.nudge.app.ui.LoginScreen
 import com.nudge.app.ui.MinigameScreen
+import com.nudge.app.ui.PatientDetailScreen
+import com.nudge.app.ui.PhysicianDashboardScreen
 import com.nudge.app.ui.SignUpScreen
 import com.nudge.app.ui.SummaryScreen
 import com.nudge.app.ui.TherapySessionScreen
@@ -56,6 +58,7 @@ class MainActivity : ComponentActivity() {
 fun NudgeApp() {
     val navController = rememberNavController()
     var userRole by remember { mutableStateOf<UserRole?>(null) }
+    var currentUsername by remember { mutableStateOf<String?>(null) }
     val bluetoothViewModel: BluetoothViewModel = hiltViewModel()
 
     val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -72,11 +75,14 @@ fun NudgeApp() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ -> /* Permissions handled */ }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(currentUsername) {
         launcher.launch(permissionsToRequest)
+        currentUsername?.let {
+            bluetoothViewModel.setCurrentUser(it)
+        }
     }
 
-    NavHost(navController = navController, startDestination = "device_select") {
+    NavHost(navController = navController, startDestination = "welcome") {
         composable("welcome") {
             WelcomeScreen(
                 onNavigateToLogin = { navController.navigate("login") },
@@ -85,15 +91,23 @@ fun NudgeApp() {
         }
         composable("login") {
             LoginScreen(
-                onLoginSuccess = { role ->
+                onLoginSuccess = { username, role ->
+                    currentUsername = username
                     userRole = role
-                    navController.navigate("device_select")
+                    if (role == UserRole.PHYSICIAN) {
+                        navController.navigate("summary")
+                    } else {
+                        navController.navigate("device_select")
+                    }
                 },
                 onForgotPassword = { navController.navigate("forgot_password") }
             )
         }
         composable("signup") {
-            SignUpScreen(onSignUpSuccess = { navController.navigate("login") })
+            SignUpScreen(onSignUpSuccess = { username ->
+                currentUsername = username
+                navController.navigate("login")
+            })
         }
         composable("forgot_password") {
             ForgotPasswordScreen(onResetSuccess = { navController.navigate("login") })
@@ -104,12 +118,17 @@ fun NudgeApp() {
                 onDeviceSelected = { device ->
                     bluetoothViewModel.connectToDevice(device)
                     navController.navigate("summary")
+                },
+                onSkipConnection = {
+                    navController.navigate("summary")
                 }
             )
         }
         composable("summary") {
             SummaryScreen(
                 viewModel = bluetoothViewModel,
+                userRole = userRole ?: UserRole.PATIENT,
+                username = currentUsername ?: "guest",
                 onConnectWithPhysician = {
                     navController.navigate("connect_physician")
                 },
@@ -118,6 +137,9 @@ fun NudgeApp() {
                 },
                 onStartMinigame = {
                     navController.navigate("minigame")
+                },
+                onViewPhysicianDashboard = {
+                    navController.navigate("physician_dashboard")
                 }
             )
         }
@@ -125,12 +147,34 @@ fun NudgeApp() {
             TherapySessionScreen(onSessionEnd = { navController.popBackStack() })
         }
         composable("minigame") {
-            MinigameScreen(onGameEnd = { navController.popBackStack() })
+            MinigameScreen(
+                username = currentUsername ?: "guest",
+                onGameEnd = { navController.popBackStack() }
+            )
         }
         composable("connect_physician") {
-            ConnectPhysicianScreen(onConnectionSuccess = {
-                navController.popBackStack()
-            })
+            ConnectPhysicianScreen(
+                username = currentUsername ?: "guest",
+                onConnectionSuccess = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        composable("physician_dashboard") {
+            PhysicianDashboardScreen(
+                physicianEmail = currentUsername ?: "",
+                onNavigateToPatientDetail = { patientUsername ->
+                    navController.navigate("patient_detail/$patientUsername")
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable("patient_detail/{patientUsername}") { backStackEntry ->
+            val patientUsername = backStackEntry.arguments?.getString("patientUsername") ?: ""
+            PatientDetailScreen(
+                patientUsername = patientUsername,
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }

@@ -17,17 +17,37 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.nudge.app.data.UserRole
 import com.nudge.app.ui.theme.NudgeTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SignUpScreen(onSignUpSuccess: () -> Unit) {
+fun SignUpScreen(
+    onSignUpSuccess: (String) -> Unit,
+    viewModel: AuthViewModel = hiltViewModel()
+) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var selectedRole by remember { mutableStateOf(UserRole.PATIENT) }
+
+    val authState by viewModel.authState.collectAsState()
+
+    LaunchedEffect(authState) {
+        when (val result = authState) {
+            is AuthResult.SignUpSuccess -> {
+                onSignUpSuccess(result.username)
+                viewModel.resetAuthState()
+            }
+            is AuthResult.Error -> {
+                errorMessage = result.message
+                viewModel.resetAuthState()
+            }
+            else -> {}
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -139,7 +159,7 @@ fun SignUpScreen(onSignUpSuccess: () -> Unit) {
                 } else if (password != confirmPassword) {
                     errorMessage = "Passwords do not match"
                 } else {
-                    onSignUpSuccess()
+                    viewModel.signUp(username, password, selectedRole)
                 }
             },
             modifier = Modifier
@@ -156,6 +176,6 @@ fun SignUpScreen(onSignUpSuccess: () -> Unit) {
 @Composable
 fun SignUpScreenPreview() {
     NudgeTheme {
-        SignUpScreen(onSignUpSuccess = {})
+        SignUpScreen(onSignUpSuccess = { _ -> })
     }
 }

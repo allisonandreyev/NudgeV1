@@ -8,6 +8,22 @@ import androidx.lifecycle.SavedStateHandle;
 import androidx.lifecycle.ViewModel;
 import com.nudge.app.bluetooth.BluetoothViewModel;
 import com.nudge.app.bluetooth.BluetoothViewModel_HiltModules;
+import com.nudge.app.data.DataPointDao;
+import com.nudge.app.data.NudgeDatabase;
+import com.nudge.app.data.PhysicianConnectionDao;
+import com.nudge.app.data.UserDao;
+import com.nudge.app.data.UserStatsDao;
+import com.nudge.app.di.DatabaseModule_ProvideDataPointDaoFactory;
+import com.nudge.app.di.DatabaseModule_ProvideDatabaseFactory;
+import com.nudge.app.di.DatabaseModule_ProvidePhysicianConnectionDaoFactory;
+import com.nudge.app.di.DatabaseModule_ProvideUserDaoFactory;
+import com.nudge.app.di.DatabaseModule_ProvideUserStatsDaoFactory;
+import com.nudge.app.ui.AuthViewModel;
+import com.nudge.app.ui.AuthViewModel_HiltModules;
+import com.nudge.app.ui.MinigameViewModel;
+import com.nudge.app.ui.MinigameViewModel_HiltModules;
+import com.nudge.app.ui.PhysicianViewModel;
+import com.nudge.app.ui.PhysicianViewModel_HiltModules;
 import dagger.hilt.android.ActivityRetainedLifecycle;
 import dagger.hilt.android.ViewModelLifecycle;
 import dagger.hilt.android.internal.builders.ActivityComponentBuilder;
@@ -28,6 +44,7 @@ import dagger.internal.DoubleCheck;
 import dagger.internal.IdentifierNameString;
 import dagger.internal.KeepFieldType;
 import dagger.internal.LazyClassKeyMap;
+import dagger.internal.MapBuilder;
 import dagger.internal.Preconditions;
 import dagger.internal.Provider;
 import java.util.Collections;
@@ -367,7 +384,7 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
 
     @Override
     public Map<Class<?>, Boolean> getViewModelKeys() {
-      return LazyClassKeyMap.<Boolean>of(Collections.<String, Boolean>singletonMap(LazyClassKeyProvider.com_nudge_app_bluetooth_BluetoothViewModel, BluetoothViewModel_HiltModules.KeyModule.provide()));
+      return LazyClassKeyMap.<Boolean>of(MapBuilder.<String, Boolean>newMapBuilder(4).put(LazyClassKeyProvider.com_nudge_app_ui_AuthViewModel, AuthViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_nudge_app_bluetooth_BluetoothViewModel, BluetoothViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_nudge_app_ui_MinigameViewModel, MinigameViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_nudge_app_ui_PhysicianViewModel, PhysicianViewModel_HiltModules.KeyModule.provide()).build());
     }
 
     @Override
@@ -387,7 +404,22 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
 
     @IdentifierNameString
     private static final class LazyClassKeyProvider {
+      static String com_nudge_app_ui_PhysicianViewModel = "com.nudge.app.ui.PhysicianViewModel";
+
+      static String com_nudge_app_ui_MinigameViewModel = "com.nudge.app.ui.MinigameViewModel";
+
+      static String com_nudge_app_ui_AuthViewModel = "com.nudge.app.ui.AuthViewModel";
+
       static String com_nudge_app_bluetooth_BluetoothViewModel = "com.nudge.app.bluetooth.BluetoothViewModel";
+
+      @KeepFieldType
+      PhysicianViewModel com_nudge_app_ui_PhysicianViewModel2;
+
+      @KeepFieldType
+      MinigameViewModel com_nudge_app_ui_MinigameViewModel2;
+
+      @KeepFieldType
+      AuthViewModel com_nudge_app_ui_AuthViewModel2;
 
       @KeepFieldType
       BluetoothViewModel com_nudge_app_bluetooth_BluetoothViewModel2;
@@ -401,7 +433,13 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
 
     private final ViewModelCImpl viewModelCImpl = this;
 
+    private Provider<AuthViewModel> authViewModelProvider;
+
     private Provider<BluetoothViewModel> bluetoothViewModelProvider;
+
+    private Provider<MinigameViewModel> minigameViewModelProvider;
+
+    private Provider<PhysicianViewModel> physicianViewModelProvider;
 
     private ViewModelCImpl(SingletonCImpl singletonCImpl,
         ActivityRetainedCImpl activityRetainedCImpl, SavedStateHandle savedStateHandleParam,
@@ -416,12 +454,15 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
     @SuppressWarnings("unchecked")
     private void initialize(final SavedStateHandle savedStateHandleParam,
         final ViewModelLifecycle viewModelLifecycleParam) {
-      this.bluetoothViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 0);
+      this.authViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 0);
+      this.bluetoothViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 1);
+      this.minigameViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 2);
+      this.physicianViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 3);
     }
 
     @Override
     public Map<Class<?>, javax.inject.Provider<ViewModel>> getHiltViewModelMap() {
-      return LazyClassKeyMap.<javax.inject.Provider<ViewModel>>of(Collections.<String, javax.inject.Provider<ViewModel>>singletonMap(LazyClassKeyProvider.com_nudge_app_bluetooth_BluetoothViewModel, ((Provider) bluetoothViewModelProvider)));
+      return LazyClassKeyMap.<javax.inject.Provider<ViewModel>>of(MapBuilder.<String, javax.inject.Provider<ViewModel>>newMapBuilder(4).put(LazyClassKeyProvider.com_nudge_app_ui_AuthViewModel, ((Provider) authViewModelProvider)).put(LazyClassKeyProvider.com_nudge_app_bluetooth_BluetoothViewModel, ((Provider) bluetoothViewModelProvider)).put(LazyClassKeyProvider.com_nudge_app_ui_MinigameViewModel, ((Provider) minigameViewModelProvider)).put(LazyClassKeyProvider.com_nudge_app_ui_PhysicianViewModel, ((Provider) physicianViewModelProvider)).build());
     }
 
     @Override
@@ -433,8 +474,23 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
     private static final class LazyClassKeyProvider {
       static String com_nudge_app_bluetooth_BluetoothViewModel = "com.nudge.app.bluetooth.BluetoothViewModel";
 
+      static String com_nudge_app_ui_PhysicianViewModel = "com.nudge.app.ui.PhysicianViewModel";
+
+      static String com_nudge_app_ui_AuthViewModel = "com.nudge.app.ui.AuthViewModel";
+
+      static String com_nudge_app_ui_MinigameViewModel = "com.nudge.app.ui.MinigameViewModel";
+
       @KeepFieldType
       BluetoothViewModel com_nudge_app_bluetooth_BluetoothViewModel2;
+
+      @KeepFieldType
+      PhysicianViewModel com_nudge_app_ui_PhysicianViewModel2;
+
+      @KeepFieldType
+      AuthViewModel com_nudge_app_ui_AuthViewModel2;
+
+      @KeepFieldType
+      MinigameViewModel com_nudge_app_ui_MinigameViewModel2;
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {
@@ -458,8 +514,17 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
       @Override
       public T get() {
         switch (id) {
-          case 0: // com.nudge.app.bluetooth.BluetoothViewModel 
-          return (T) new BluetoothViewModel(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
+          case 0: // com.nudge.app.ui.AuthViewModel 
+          return (T) new AuthViewModel(singletonCImpl.userDao());
+
+          case 1: // com.nudge.app.bluetooth.BluetoothViewModel 
+          return (T) new BluetoothViewModel(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule), singletonCImpl.dataPointDao());
+
+          case 2: // com.nudge.app.ui.MinigameViewModel 
+          return (T) new MinigameViewModel(singletonCImpl.userStatsDao());
+
+          case 3: // com.nudge.app.ui.PhysicianViewModel 
+          return (T) new PhysicianViewModel(singletonCImpl.physicianConnectionDao(), singletonCImpl.userStatsDao());
 
           default: throw new AssertionError(id);
         }
@@ -541,9 +606,33 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
 
     private final SingletonCImpl singletonCImpl = this;
 
+    private Provider<NudgeDatabase> provideDatabaseProvider;
+
     private SingletonCImpl(ApplicationContextModule applicationContextModuleParam) {
       this.applicationContextModule = applicationContextModuleParam;
+      initialize(applicationContextModuleParam);
 
+    }
+
+    private UserDao userDao() {
+      return DatabaseModule_ProvideUserDaoFactory.provideUserDao(provideDatabaseProvider.get());
+    }
+
+    private DataPointDao dataPointDao() {
+      return DatabaseModule_ProvideDataPointDaoFactory.provideDataPointDao(provideDatabaseProvider.get());
+    }
+
+    private UserStatsDao userStatsDao() {
+      return DatabaseModule_ProvideUserStatsDaoFactory.provideUserStatsDao(provideDatabaseProvider.get());
+    }
+
+    private PhysicianConnectionDao physicianConnectionDao() {
+      return DatabaseModule_ProvidePhysicianConnectionDaoFactory.providePhysicianConnectionDao(provideDatabaseProvider.get());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void initialize(final ApplicationContextModule applicationContextModuleParam) {
+      this.provideDatabaseProvider = DoubleCheck.provider(new SwitchingProvider<NudgeDatabase>(singletonCImpl, 0));
     }
 
     @Override
@@ -563,6 +652,28 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
     @Override
     public ServiceComponentBuilder serviceComponentBuilder() {
       return new ServiceCBuilder(singletonCImpl);
+    }
+
+    private static final class SwitchingProvider<T> implements Provider<T> {
+      private final SingletonCImpl singletonCImpl;
+
+      private final int id;
+
+      SwitchingProvider(SingletonCImpl singletonCImpl, int id) {
+        this.singletonCImpl = singletonCImpl;
+        this.id = id;
+      }
+
+      @SuppressWarnings("unchecked")
+      @Override
+      public T get() {
+        switch (id) {
+          case 0: // com.nudge.app.data.NudgeDatabase 
+          return (T) DatabaseModule_ProvideDatabaseFactory.provideDatabase(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
+
+          default: throw new AssertionError(id);
+        }
+      }
     }
   }
 }

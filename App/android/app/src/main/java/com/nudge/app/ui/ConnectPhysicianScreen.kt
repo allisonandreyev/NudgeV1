@@ -7,13 +7,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.nudge.app.ui.theme.NudgeTheme
 
 @Composable
-fun ConnectPhysicianScreen(onConnectionSuccess: () -> Unit) {
+fun ConnectPhysicianScreen(
+    username: String,
+    onConnectionSuccess: () -> Unit,
+    viewModel: PhysicianViewModel = hiltViewModel()
+) {
     var identifier by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSuccess by remember { mutableStateOf(false) }
+
+    LaunchedEffect(username) {
+        viewModel.setUsername(username)
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -60,6 +69,7 @@ fun ConnectPhysicianScreen(onConnectionSuccess: () -> Unit) {
                         if (identifier.lowercase().contains("patient")) {
                             errorMessage = "Error: This account is not a Physician account."
                         } else {
+                            viewModel.connectPhysician(identifier, username, "Physician Name")
                             isSuccess = true
                             errorMessage = null
                         }
@@ -92,6 +102,6 @@ fun ConnectPhysicianScreen(onConnectionSuccess: () -> Unit) {
 @Composable
 fun ConnectPhysicianScreenPreview() {
     NudgeTheme {
-        ConnectPhysicianScreen(onConnectionSuccess = {})
+        ConnectPhysicianScreen(username = "test", onConnectionSuccess = {})
     }
 }

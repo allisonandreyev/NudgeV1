@@ -21,6 +21,13 @@ import hilt_aggregated_deps._com_nudge_app_MainActivity_GeneratedInjector;
 import hilt_aggregated_deps._com_nudge_app_NudgeApplication_GeneratedInjector;
 import hilt_aggregated_deps._com_nudge_app_bluetooth_BluetoothViewModel_HiltModules_BindsModule;
 import hilt_aggregated_deps._com_nudge_app_bluetooth_BluetoothViewModel_HiltModules_KeyModule;
+import hilt_aggregated_deps._com_nudge_app_di_DatabaseModule;
+import hilt_aggregated_deps._com_nudge_app_ui_AuthViewModel_HiltModules_BindsModule;
+import hilt_aggregated_deps._com_nudge_app_ui_AuthViewModel_HiltModules_KeyModule;
+import hilt_aggregated_deps._com_nudge_app_ui_MinigameViewModel_HiltModules_BindsModule;
+import hilt_aggregated_deps._com_nudge_app_ui_MinigameViewModel_HiltModules_KeyModule;
+import hilt_aggregated_deps._com_nudge_app_ui_PhysicianViewModel_HiltModules_BindsModule;
+import hilt_aggregated_deps._com_nudge_app_ui_PhysicianViewModel_HiltModules_KeyModule;
 import hilt_aggregated_deps._dagger_hilt_android_flags_FragmentGetContextFix_FragmentGetContextFixEntryPoint;
 import hilt_aggregated_deps._dagger_hilt_android_flags_HiltWrapper_FragmentGetContextFix_FragmentGetContextFixModule;
 import hilt_aggregated_deps._dagger_hilt_android_internal_lifecycle_DefaultViewModelFactories_ActivityEntryPoint;
@@ -65,6 +72,13 @@ import hilt_aggregated_deps._dagger_hilt_android_internal_modules_HiltWrapper_Ac
         _com_nudge_app_NudgeApplication_GeneratedInjector.class,
         _com_nudge_app_bluetooth_BluetoothViewModel_HiltModules_BindsModule.class,
         _com_nudge_app_bluetooth_BluetoothViewModel_HiltModules_KeyModule.class,
+        _com_nudge_app_di_DatabaseModule.class,
+        _com_nudge_app_ui_AuthViewModel_HiltModules_BindsModule.class,
+        _com_nudge_app_ui_AuthViewModel_HiltModules_KeyModule.class,
+        _com_nudge_app_ui_MinigameViewModel_HiltModules_BindsModule.class,
+        _com_nudge_app_ui_MinigameViewModel_HiltModules_KeyModule.class,
+        _com_nudge_app_ui_PhysicianViewModel_HiltModules_BindsModule.class,
+        _com_nudge_app_ui_PhysicianViewModel_HiltModules_KeyModule.class,
         _dagger_hilt_android_flags_FragmentGetContextFix_FragmentGetContextFixEntryPoint.class,
         _dagger_hilt_android_flags_HiltWrapper_FragmentGetContextFix_FragmentGetContextFixModule.class,
         _dagger_hilt_android_internal_lifecycle_DefaultViewModelFactories_ActivityEntryPoint.class,
