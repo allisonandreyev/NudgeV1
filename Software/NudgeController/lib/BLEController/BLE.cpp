@@ -166,7 +166,10 @@ NimBLECharacteristic* BLE::GetCharacteristic(const char* name)
 
   // If the service or characteristic is no longer active, fail out ("deleted" characteristic)
   if (it == bleCharacteristics.end())
+  {
+    Serial.printf("Cannot find characteristic '%s'.\r\n", name);
     return nullptr;
+  }
 
   // Return the found characteristic
   return it->second.characteristic;

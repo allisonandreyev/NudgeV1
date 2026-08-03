@@ -4,8 +4,8 @@ BLE ble;
 
 void setup()
 {
+  Serial.begin(115200);
   ServoController::Init();
-  ble.Init();
   ServoController::SetServo(8, 180, 35);
 
   ble.Init("Nudge Prototype 0.0.1");
@@ -18,7 +18,7 @@ void setup()
   ble.AddCharacteristic("TX", "SendEMGData", "00008488-D47A-CEDE-0000-466178454d47", PROP::READ | PROP::NOTIFY); // FaxEMG
   ble.AddCharacteristic("RX", "ReceiveCmds", "00008288-D47A-CEDE-0000-526563436d64", PROP::WRITE | PROP::WRITE_NR); //RecCmd
 
-  ble.SetCallbacks("RX",
+  ble.SetCallbacks("ReceiveCmds",
   {
     .onWrite = [](auto* c, auto& info)
     {
@@ -37,31 +37,31 @@ void setup()
 uint8_t c = 0;
 void loop()
 {
-  Packet p;
-  
-  p.SetFlags(0);
-  p.SetMessageID(c++);
-  p.SetVersion(2);
+  // Packet p;
 
-  p.Append(NULL);
-  
-  auto packetQueue = p.Serialize();
-  while(!packetQueue.empty() && ble.ClientConnected())
-  {
-    auto packet = packetQueue.front();
-    
-    Serial.printf("Sending %u bytes\r\n", packet.size());
-    Serial.printf( "Sending segment %d/%d size=%u\n", (packet[3] & 0x0F) + 1, packet[3] >> 4, packet.size());
-    
-    ble.SetValue("SendEMGData", packet);
-    ble.UpdateClients();
-    
-    // PrintHex(packet);
-    delay(25);
-    packetQueue.erase(packetQueue.begin());
-  }
+  // p.SetFlags(0);
+  // p.SetMessageID(c++);
+  // p.SetVersion(2);
 
-  p.ClearData();
+  // p.Append(NULL);
+
+  // auto packetQueue = p.Serialize();
+  // while(!packetQueue.empty() && ble.ClientConnected())
+  // {
+  //   auto packet = packetQueue.front();
+  
+  //   Serial.printf("Sending %u bytes\r\n", packet.size());
+  //   Serial.printf( "Sending segment %d/%d size=%u\n", (packet[3] & 0x0F) + 1, packet[3] >> 4, packet.size());
+  
+  //   ble.SetValue("SendEMGData", packet);
+  //   ble.UpdateClients();
+  
+  //   // PrintHex(packet);
+  //   delay(25);
+  //   packetQueue.erase(packetQueue.begin());
+  // }
+
+  // p.ClearData();
 }
 
 /*
