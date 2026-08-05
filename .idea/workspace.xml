@@ -10,22 +10,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9135cdeb-074b-44f0-8372-ee77a91b5318" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/Hilt_MainActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/Hilt_MainActivity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/MainActivity_GeneratedInjector.java" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/MainActivity_GeneratedInjector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/NudgeApplication_GeneratedInjector.java" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/NudgeApplication_GeneratedInjector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/bluetooth/BluetoothViewModel_Factory.java" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/bluetooth/BluetoothViewModel_Factory.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/bluetooth/BluetoothViewModel_HiltModules.java" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/bluetooth/BluetoothViewModel_HiltModules.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/bluetooth/BluetoothViewModel_HiltModules_KeyModule_ProvideFactory.java" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/bluetooth/BluetoothViewModel_HiltModules_KeyModule_ProvideFactory.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/data/DataPointDao_Impl.java" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/data/DataPointDao_Impl.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/data/NudgeDatabase_Impl.java" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/com/nudge/app/data/NudgeDatabase_Impl.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/dagger/hilt/internal/aggregatedroot/codegen/_com_nudge_app_NudgeApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/dagger/hilt/internal/aggregatedroot/codegen/_com_nudge_app_NudgeApplication.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/hilt_aggregated_deps/_com_nudge_app_MainActivity_GeneratedInjector.java" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/hilt_aggregated_deps/_com_nudge_app_MainActivity_GeneratedInjector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/hilt_aggregated_deps/_com_nudge_app_NudgeApplication_GeneratedInjector.java" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/hilt_aggregated_deps/_com_nudge_app_NudgeApplication_GeneratedInjector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/hilt_aggregated_deps/_com_nudge_app_bluetooth_BluetoothViewModel_HiltModules_BindsModule.java" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/hilt_aggregated_deps/_com_nudge_app_bluetooth_BluetoothViewModel_HiltModules_BindsModule.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/hilt_aggregated_deps/_com_nudge_app_bluetooth_BluetoothViewModel_HiltModules_KeyModule.java" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/build/generated/ksp/debug/java/hilt_aggregated_deps/_com_nudge_app_bluetooth_BluetoothViewModel_HiltModules_KeyModule.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/src/main/java/com/nudge/app/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/src/main/java/com/nudge/app/MainActivity.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/src/main/java/com/nudge/app/bluetooth/BluetoothLeService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/src/main/java/com/nudge/app/bluetooth/BluetoothLeService.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/App/android/app/src/main/java/com/nudge/app/ui/WelcomeScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/src/main/java/com/nudge/app/ui/WelcomeScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -35,7 +20,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[PhysicalDevice::serial=5B280DLCH001A4]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
