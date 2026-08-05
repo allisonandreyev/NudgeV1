@@ -96,7 +96,7 @@ bool BLE::StartService(const char* name)
       return false;
 
   // Start the service
-  it->second.service->start();
+  // it->second.service->start();  
   Serial.printf("Service '%s' successfully started.\r\n", name);
   return true;
 }
