@@ -1,6 +1,8 @@
 package com.nudge.app.ui;
 
+import com.nudge.app.data.DataPointDao;
 import com.nudge.app.data.PhysicianConnectionDao;
+import com.nudge.app.data.TherapySessionDao;
 import com.nudge.app.data.UserStatsDao;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
@@ -28,25 +30,35 @@ public final class PhysicianViewModel_Factory implements Factory<PhysicianViewMo
 
   private final Provider<UserStatsDao> userStatsDaoProvider;
 
+  private final Provider<TherapySessionDao> therapySessionDaoProvider;
+
+  private final Provider<DataPointDao> dataPointDaoProvider;
+
   public PhysicianViewModel_Factory(Provider<PhysicianConnectionDao> physicianConnectionDaoProvider,
-      Provider<UserStatsDao> userStatsDaoProvider) {
+      Provider<UserStatsDao> userStatsDaoProvider,
+      Provider<TherapySessionDao> therapySessionDaoProvider,
+      Provider<DataPointDao> dataPointDaoProvider) {
     this.physicianConnectionDaoProvider = physicianConnectionDaoProvider;
     this.userStatsDaoProvider = userStatsDaoProvider;
+    this.therapySessionDaoProvider = therapySessionDaoProvider;
+    this.dataPointDaoProvider = dataPointDaoProvider;
   }
 
   @Override
   public PhysicianViewModel get() {
-    return newInstance(physicianConnectionDaoProvider.get(), userStatsDaoProvider.get());
+    return newInstance(physicianConnectionDaoProvider.get(), userStatsDaoProvider.get(), therapySessionDaoProvider.get(), dataPointDaoProvider.get());
   }
 
   public static PhysicianViewModel_Factory create(
       Provider<PhysicianConnectionDao> physicianConnectionDaoProvider,
-      Provider<UserStatsDao> userStatsDaoProvider) {
-    return new PhysicianViewModel_Factory(physicianConnectionDaoProvider, userStatsDaoProvider);
+      Provider<UserStatsDao> userStatsDaoProvider,
+      Provider<TherapySessionDao> therapySessionDaoProvider,
+      Provider<DataPointDao> dataPointDaoProvider) {
+    return new PhysicianViewModel_Factory(physicianConnectionDaoProvider, userStatsDaoProvider, therapySessionDaoProvider, dataPointDaoProvider);
   }
 
   public static PhysicianViewModel newInstance(PhysicianConnectionDao physicianConnectionDao,
-      UserStatsDao userStatsDao) {
-    return new PhysicianViewModel(physicianConnectionDao, userStatsDao);
+      UserStatsDao userStatsDao, TherapySessionDao therapySessionDao, DataPointDao dataPointDao) {
+    return new PhysicianViewModel(physicianConnectionDao, userStatsDao, therapySessionDao, dataPointDao);
   }
 }

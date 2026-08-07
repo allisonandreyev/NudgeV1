@@ -13,4 +13,7 @@ interface UserStatsDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(stats: UserStats)
+
+    @Query("DELETE FROM user_stats WHERE username = :username")
+    suspend fun deleteStatsForUser(username: String)
 }

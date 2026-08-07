@@ -30,6 +30,8 @@ import com.nudge.app.ui.LoginScreen
 import com.nudge.app.ui.MinigameScreen
 import com.nudge.app.ui.PatientDetailScreen
 import com.nudge.app.ui.PhysicianDashboardScreen
+import com.nudge.app.ui.SessionDetailScreen
+import com.nudge.app.ui.SettingsScreen
 import com.nudge.app.ui.SignUpScreen
 import com.nudge.app.ui.SummaryScreen
 import com.nudge.app.ui.TherapySessionScreen
@@ -145,11 +147,17 @@ fun NudgeApp() {
                 },
                 onViewPhysicianDashboard = {
                     navController.navigate("physician_dashboard")
+                },
+                onNavigateToSettings = {
+                    navController.navigate("settings")
                 }
             )
         }
         composable("therapy") {
-            TherapySessionScreen(onSessionEnd = { navController.popBackStack() })
+            TherapySessionScreen(
+                username = currentUsername ?: "guest",
+                onSessionEnd = { navController.popBackStack() }
+            )
         }
         composable("minigame") {
             MinigameScreen(
@@ -178,6 +186,37 @@ fun NudgeApp() {
             val patientUsername = backStackEntry.arguments?.getString("patientUsername") ?: ""
             PatientDetailScreen(
                 patientUsername = patientUsername,
+                onBack = { navController.popBackStack() },
+                onNavigateToSessionDetail = { sessionId ->
+                    navController.navigate("session_detail/$sessionId")
+                }
+            )
+        }
+        composable("session_detail/{sessionId}") { backStackEntry ->
+            val sessionId = backStackEntry.arguments?.getString("sessionId")?.toLongOrNull() ?: 0L
+            SessionDetailScreen(
+                sessionId = sessionId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable("settings") {
+            SettingsScreen(
+                username = currentUsername ?: "guest",
+                role = userRole ?: UserRole.PATIENT,
+                onLogout = {
+                    currentUsername = null
+                    userRole = null
+                    navController.navigate("welcome") {
+                        popUpTo(0)
+                    }
+                },
+                onAccountDeleted = {
+                    currentUsername = null
+                    userRole = null
+                    navController.navigate("welcome") {
+                        popUpTo(0)
+                    }
+                },
                 onBack = { navController.popBackStack() }
             )
         }

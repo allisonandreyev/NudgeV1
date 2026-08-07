@@ -1,6 +1,10 @@
 package com.nudge.app.ui;
 
+import com.nudge.app.data.DataPointDao;
+import com.nudge.app.data.PhysicianConnectionDao;
+import com.nudge.app.data.TherapySessionDao;
 import com.nudge.app.data.UserDao;
+import com.nudge.app.data.UserStatsDao;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
 import dagger.internal.QualifierMetadata;
@@ -25,20 +29,40 @@ import javax.inject.Provider;
 public final class AuthViewModel_Factory implements Factory<AuthViewModel> {
   private final Provider<UserDao> userDaoProvider;
 
-  public AuthViewModel_Factory(Provider<UserDao> userDaoProvider) {
+  private final Provider<DataPointDao> dataPointDaoProvider;
+
+  private final Provider<UserStatsDao> userStatsDaoProvider;
+
+  private final Provider<PhysicianConnectionDao> physicianConnectionDaoProvider;
+
+  private final Provider<TherapySessionDao> therapySessionDaoProvider;
+
+  public AuthViewModel_Factory(Provider<UserDao> userDaoProvider,
+      Provider<DataPointDao> dataPointDaoProvider, Provider<UserStatsDao> userStatsDaoProvider,
+      Provider<PhysicianConnectionDao> physicianConnectionDaoProvider,
+      Provider<TherapySessionDao> therapySessionDaoProvider) {
     this.userDaoProvider = userDaoProvider;
+    this.dataPointDaoProvider = dataPointDaoProvider;
+    this.userStatsDaoProvider = userStatsDaoProvider;
+    this.physicianConnectionDaoProvider = physicianConnectionDaoProvider;
+    this.therapySessionDaoProvider = therapySessionDaoProvider;
   }
 
   @Override
   public AuthViewModel get() {
-    return newInstance(userDaoProvider.get());
+    return newInstance(userDaoProvider.get(), dataPointDaoProvider.get(), userStatsDaoProvider.get(), physicianConnectionDaoProvider.get(), therapySessionDaoProvider.get());
   }
 
-  public static AuthViewModel_Factory create(Provider<UserDao> userDaoProvider) {
-    return new AuthViewModel_Factory(userDaoProvider);
+  public static AuthViewModel_Factory create(Provider<UserDao> userDaoProvider,
+      Provider<DataPointDao> dataPointDaoProvider, Provider<UserStatsDao> userStatsDaoProvider,
+      Provider<PhysicianConnectionDao> physicianConnectionDaoProvider,
+      Provider<TherapySessionDao> therapySessionDaoProvider) {
+    return new AuthViewModel_Factory(userDaoProvider, dataPointDaoProvider, userStatsDaoProvider, physicianConnectionDaoProvider, therapySessionDaoProvider);
   }
 
-  public static AuthViewModel newInstance(UserDao userDao) {
-    return new AuthViewModel(userDao);
+  public static AuthViewModel newInstance(UserDao userDao, DataPointDao dataPointDao,
+      UserStatsDao userStatsDao, PhysicianConnectionDao physicianConnectionDao,
+      TherapySessionDao therapySessionDao) {
+    return new AuthViewModel(userDao, dataPointDao, userStatsDao, physicianConnectionDao, therapySessionDao);
   }
 }

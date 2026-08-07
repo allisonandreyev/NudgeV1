@@ -23,4 +23,7 @@ interface PhysicianConnectionDao {
 
     @Query("DELETE FROM physician_connections WHERE physicianEmail = :email AND patientUsername = :patientUsername")
     suspend fun deleteConnection(email: String, patientUsername: String)
+
+    @Query("DELETE FROM physician_connections WHERE patientUsername = :username OR physicianEmail = :username")
+    suspend fun deleteAllConnectionsForUser(username: String)
 }

@@ -2,9 +2,7 @@ package com.nudge.app.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.nudge.app.data.User
-import com.nudge.app.data.UserDao
-import com.nudge.app.data.UserRole
+import com.nudge.app.data.*
 import com.nudge.app.utils.SecurityUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +12,11 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val userDao: UserDao
+    private val userDao: UserDao,
+    private val dataPointDao: DataPointDao,
+    private val userStatsDao: UserStatsDao,
+    private val physicianConnectionDao: PhysicianConnectionDao,
+    private val therapySessionDao: TherapySessionDao
 ) : ViewModel() {
 
     private val _authState = MutableStateFlow<AuthResult?>(null)
@@ -52,6 +54,23 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    fun deleteAccount(username: String) {
+        viewModelScope.launch {
+            try {
+                // Delete data from all tables associated with this user
+                dataPointDao.deleteDataForUser(username)
+                userStatsDao.deleteStatsForUser(username)
+                physicianConnectionDao.deleteAllConnectionsForUser(username)
+                therapySessionDao.deleteSessionsForUser(username)
+                userDao.deleteUser(username)
+                
+                _authState.value = AuthResult.Deleted
+            } catch (e: Exception) {
+                _authState.value = AuthResult.Error("Failed to delete account")
+            }
+        }
+    }
+
     fun resetAuthState() {
         _authState.value = null
     }
@@ -61,4 +80,5 @@ sealed class AuthResult {
     data class Success(val username: String, val role: UserRole) : AuthResult()
     data class SignUpSuccess(val username: String) : AuthResult()
     data class Error(val message: String) : AuthResult()
+    object Deleted : AuthResult()
 }

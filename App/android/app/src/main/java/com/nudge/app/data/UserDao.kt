@@ -12,4 +12,7 @@ interface UserDao {
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun registerUser(user: User)
+
+    @Query("DELETE FROM users WHERE username = :username")
+    suspend fun deleteUser(username: String)
 }

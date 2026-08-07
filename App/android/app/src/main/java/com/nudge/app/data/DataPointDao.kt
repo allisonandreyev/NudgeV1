@@ -16,4 +16,10 @@ interface DataPointDao {
 
     @Query("SELECT * FROM data_points WHERE username = :username AND type = :type ORDER BY timestamp DESC")
     fun getDataPointsByType(username: String, type: String): Flow<List<DataPoint>>
+
+    @Query("SELECT * FROM data_points WHERE sessionId = :sessionId ORDER BY timestamp ASC")
+    fun getPointsForSession(sessionId: Long): Flow<List<DataPoint>>
+
+    @Query("DELETE FROM data_points WHERE username = :username")
+    suspend fun deleteDataForUser(username: String)
 }

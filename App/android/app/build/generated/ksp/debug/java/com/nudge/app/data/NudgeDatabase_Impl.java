@@ -34,18 +34,21 @@ public final class NudgeDatabase_Impl extends NudgeDatabase {
 
   private volatile UserDao _userDao;
 
+  private volatile TherapySessionDao _therapySessionDao;
+
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(4) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(6) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
-        db.execSQL("CREATE TABLE IF NOT EXISTS `data_points` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `username` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `value` REAL NOT NULL, `type` TEXT NOT NULL, `isSynced` INTEGER NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `data_points` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `username` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `value` REAL NOT NULL, `type` TEXT NOT NULL, `sensorId` INTEGER NOT NULL, `sessionId` INTEGER, `isSynced` INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS `physician_connections` (`physicianEmail` TEXT NOT NULL, `patientUsername` TEXT NOT NULL, `physicianName` TEXT NOT NULL, `connectionDate` INTEGER NOT NULL, `status` TEXT NOT NULL, `isSynced` INTEGER NOT NULL, PRIMARY KEY(`physicianEmail`, `patientUsername`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `user_stats` (`username` TEXT NOT NULL, `highScore` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, PRIMARY KEY(`username`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `users` (`username` TEXT NOT NULL, `passwordHash` TEXT NOT NULL, `role` TEXT NOT NULL, PRIMARY KEY(`username`))");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `therapy_sessions` (`sessionId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `username` TEXT NOT NULL, `startTime` INTEGER NOT NULL, `endTime` INTEGER, `restPosition` TEXT NOT NULL, `isUploaded` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '66b2626e32547bb067e90ccb8775abc5')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '562c6ad067ea600042110b90885b3e85')");
       }
 
       @Override
@@ -54,6 +57,7 @@ public final class NudgeDatabase_Impl extends NudgeDatabase {
         db.execSQL("DROP TABLE IF EXISTS `physician_connections`");
         db.execSQL("DROP TABLE IF EXISTS `user_stats`");
         db.execSQL("DROP TABLE IF EXISTS `users`");
+        db.execSQL("DROP TABLE IF EXISTS `therapy_sessions`");
         final List<? extends RoomDatabase.Callback> _callbacks = mCallbacks;
         if (_callbacks != null) {
           for (RoomDatabase.Callback _callback : _callbacks) {
@@ -97,12 +101,14 @@ public final class NudgeDatabase_Impl extends NudgeDatabase {
       @NonNull
       public RoomOpenHelper.ValidationResult onValidateSchema(
           @NonNull final SupportSQLiteDatabase db) {
-        final HashMap<String, TableInfo.Column> _columnsDataPoints = new HashMap<String, TableInfo.Column>(6);
+        final HashMap<String, TableInfo.Column> _columnsDataPoints = new HashMap<String, TableInfo.Column>(8);
         _columnsDataPoints.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsDataPoints.put("username", new TableInfo.Column("username", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsDataPoints.put("timestamp", new TableInfo.Column("timestamp", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsDataPoints.put("value", new TableInfo.Column("value", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsDataPoints.put("type", new TableInfo.Column("type", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsDataPoints.put("sensorId", new TableInfo.Column("sensorId", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsDataPoints.put("sessionId", new TableInfo.Column("sessionId", "INTEGER", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsDataPoints.put("isSynced", new TableInfo.Column("isSynced", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         final HashSet<TableInfo.ForeignKey> _foreignKeysDataPoints = new HashSet<TableInfo.ForeignKey>(0);
         final HashSet<TableInfo.Index> _indicesDataPoints = new HashSet<TableInfo.Index>(0);
@@ -155,9 +161,26 @@ public final class NudgeDatabase_Impl extends NudgeDatabase {
                   + " Expected:\n" + _infoUsers + "\n"
                   + " Found:\n" + _existingUsers);
         }
+        final HashMap<String, TableInfo.Column> _columnsTherapySessions = new HashMap<String, TableInfo.Column>(7);
+        _columnsTherapySessions.put("sessionId", new TableInfo.Column("sessionId", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsTherapySessions.put("username", new TableInfo.Column("username", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsTherapySessions.put("startTime", new TableInfo.Column("startTime", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsTherapySessions.put("endTime", new TableInfo.Column("endTime", "INTEGER", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsTherapySessions.put("restPosition", new TableInfo.Column("restPosition", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsTherapySessions.put("isUploaded", new TableInfo.Column("isUploaded", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsTherapySessions.put("isSynced", new TableInfo.Column("isSynced", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysTherapySessions = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesTherapySessions = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoTherapySessions = new TableInfo("therapy_sessions", _columnsTherapySessions, _foreignKeysTherapySessions, _indicesTherapySessions);
+        final TableInfo _existingTherapySessions = TableInfo.read(db, "therapy_sessions");
+        if (!_infoTherapySessions.equals(_existingTherapySessions)) {
+          return new RoomOpenHelper.ValidationResult(false, "therapy_sessions(com.nudge.app.data.TherapySession).\n"
+                  + " Expected:\n" + _infoTherapySessions + "\n"
+                  + " Found:\n" + _existingTherapySessions);
+        }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "66b2626e32547bb067e90ccb8775abc5", "f07a5a1164ad37097bbb53b2ab092cc3");
+    }, "562c6ad067ea600042110b90885b3e85", "c7afffb8bb28695adf3ae92574fec532");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;
@@ -168,7 +191,7 @@ public final class NudgeDatabase_Impl extends NudgeDatabase {
   protected InvalidationTracker createInvalidationTracker() {
     final HashMap<String, String> _shadowTablesMap = new HashMap<String, String>(0);
     final HashMap<String, Set<String>> _viewTables = new HashMap<String, Set<String>>(0);
-    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "data_points","physician_connections","user_stats","users");
+    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "data_points","physician_connections","user_stats","users","therapy_sessions");
   }
 
   @Override
@@ -181,6 +204,7 @@ public final class NudgeDatabase_Impl extends NudgeDatabase {
       _db.execSQL("DELETE FROM `physician_connections`");
       _db.execSQL("DELETE FROM `user_stats`");
       _db.execSQL("DELETE FROM `users`");
+      _db.execSQL("DELETE FROM `therapy_sessions`");
       super.setTransactionSuccessful();
     } finally {
       super.endTransaction();
@@ -199,6 +223,7 @@ public final class NudgeDatabase_Impl extends NudgeDatabase {
     _typeConvertersMap.put(PhysicianConnectionDao.class, PhysicianConnectionDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(UserStatsDao.class, UserStatsDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(UserDao.class, UserDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(TherapySessionDao.class, TherapySessionDao_Impl.getRequiredConverters());
     return _typeConvertersMap;
   }
 
@@ -269,6 +294,20 @@ public final class NudgeDatabase_Impl extends NudgeDatabase {
           _userDao = new UserDao_Impl(this);
         }
         return _userDao;
+      }
+    }
+  }
+
+  @Override
+  public TherapySessionDao therapySessionDao() {
+    if (_therapySessionDao != null) {
+      return _therapySessionDao;
+    } else {
+      synchronized(this) {
+        if(_therapySessionDao == null) {
+          _therapySessionDao = new TherapySessionDao_Impl(this);
+        }
+        return _therapySessionDao;
       }
     }
   }

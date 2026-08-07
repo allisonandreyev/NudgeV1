@@ -50,4 +50,9 @@ object DatabaseModule {
     fun provideUserDao(database: NudgeDatabase): UserDao {
         return database.userDao()
     }
+
+    @Provides
+    fun provideTherapySessionDao(database: NudgeDatabase): TherapySessionDao {
+        return database.therapySessionDao()
+    }
 }

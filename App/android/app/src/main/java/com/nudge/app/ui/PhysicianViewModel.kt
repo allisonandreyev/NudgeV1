@@ -2,11 +2,7 @@ package com.nudge.app.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.nudge.app.data.ConnectionStatus
-import com.nudge.app.data.PhysicianConnection
-import com.nudge.app.data.PhysicianConnectionDao
-import com.nudge.app.data.UserStats
-import com.nudge.app.data.UserStatsDao
+import com.nudge.app.data.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -17,12 +13,16 @@ import javax.inject.Inject
 @HiltViewModel
 class PhysicianViewModel @Inject constructor(
     private val physicianConnectionDao: PhysicianConnectionDao,
-    private val userStatsDao: UserStatsDao
+    private val userStatsDao: UserStatsDao,
+    private val therapySessionDao: TherapySessionDao,
+    private val dataPointDao: DataPointDao
 ) : ViewModel() {
 
     private val _currentEmail = MutableStateFlow<String?>(null)
+    private val _currentPatientUsername = MutableStateFlow<String?>(null)
 
-    val connections = _currentEmail.flatMapLatest { email ->
+    // For Physician View: Get connections for this physician
+    val physicianConnections = _currentEmail.flatMapLatest { email ->
         if (email != null) {
             physicianConnectionDao.getConnectionsForPhysician(email)
         } else {
@@ -30,8 +30,24 @@ class PhysicianViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun setUsername(email: String) {
+    // For Patient View: Get connections for this patient
+    val patientConnections = _currentPatientUsername.flatMapLatest { username ->
+        if (username != null) {
+            physicianConnectionDao.getConnectionsForPatient(username)
+        } else {
+            flowOf(emptyList())
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Backwards compatibility for UI that uses 'connections'
+    val connections = physicianConnections
+
+    fun setPhysicianContext(email: String) {
         _currentEmail.value = email
+    }
+
+    fun setPatientContext(username: String) {
+        _currentPatientUsername.value = username
     }
 
     fun acceptConnection(connection: PhysicianConnection) {
@@ -59,7 +75,25 @@ class PhysicianViewModel @Inject constructor(
         }
     }
 
+    fun removeConnection(email: String, patientUsername: String) {
+        viewModelScope.launch {
+            physicianConnectionDao.deleteConnection(email, patientUsername)
+        }
+    }
+
     fun getPatientStats(username: String): Flow<UserStats?> {
         return userStatsDao.getUserStats(username)
+    }
+
+    fun getPatientSessions(username: String): Flow<List<TherapySession>> {
+        return therapySessionDao.getSessionsForUser(username)
+    }
+
+    fun getPointsForSession(sessionId: Long): Flow<List<DataPoint>> {
+        return dataPointDao.getPointsForSession(sessionId)
+    }
+
+    suspend fun getSessionById(sessionId: Long): TherapySession? {
+        return therapySessionDao.getSessionById(sessionId)
     }
 }

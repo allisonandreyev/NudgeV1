@@ -1,7 +1,9 @@
 package com.nudge.app.ui
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BarChart
@@ -20,15 +22,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PatientDetailScreen(
     patientUsername: String,
     onBack: () -> Unit,
+    onNavigateToSessionDetail: (Long) -> Unit,
     viewModel: PhysicianViewModel = hiltViewModel()
 ) {
     val stats by viewModel.getPatientStats(patientUsername).collectAsState(initial = null)
+    val sessions by viewModel.getPatientSessions(patientUsername).collectAsState(initial = emptyList())
+    
+    val dateFormatter = SimpleDateFormat("MMM dd, yyyy - HH:mm", Locale.getDefault())
 
     Scaffold(
         topBar = {
@@ -70,33 +79,76 @@ fun PatientDetailScreen(
                     modifier = Modifier.weight(1f)
                 )
                 StatCard(
-                    label = "Therapy Progress",
-                    value = "85%",
+                    label = "Total Sessions",
+                    value = sessions.size.toString(),
                     icon = Icons.Default.BarChart,
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // History Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            // History Section
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.History, contentDescription = null)
-                        Text("Recent Sessions", modifier = Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text(
+                    "REAL SESSION HISTORY",
+                    modifier = Modifier.padding(start = 8.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            if (sessions.isEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No sessions recorded yet.", color = Color.Gray)
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("• Session #42 - July 29, 2026", fontSize = 14.sp)
-                    Text("• Session #41 - July 28, 2026", fontSize = 14.sp)
-                    Text("• Session #40 - July 27, 2026", fontSize = 14.sp)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(sessions) { session ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onNavigateToSessionDetail(session.sessionId) },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Session #${session.sessionId}",
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = dateFormatter.format(Date(session.startTime)),
+                                        fontSize = 12.sp,
+                                        color = Color.Gray
+                                    )
+                                }
+                                if (session.isUploaded) {
+                                    Text("UPLOADED", color = Color(0xFF4CAF50), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = { /* Placeholder for export or notes */ },

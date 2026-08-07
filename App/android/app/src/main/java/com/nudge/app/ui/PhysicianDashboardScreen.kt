@@ -31,10 +31,10 @@ fun PhysicianDashboardScreen(
     onBack: () -> Unit,
     viewModel: PhysicianViewModel = hiltViewModel()
 ) {
-    val connections by viewModel.connections.collectAsState()
+    val connections by viewModel.physicianConnections.collectAsState()
     
     LaunchedEffect(physicianEmail) {
-        viewModel.setUsername(physicianEmail)
+        viewModel.setPhysicianContext(physicianEmail)
     }
 
     val pendingRequests = connections.filter { it.status == ConnectionStatus.PENDING }

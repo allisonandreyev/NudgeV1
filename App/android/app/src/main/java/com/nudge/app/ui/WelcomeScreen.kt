@@ -53,7 +53,7 @@ fun WelcomeScreen(
             shape = MaterialTheme.shapes.medium,
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
         ) {
-            Text("login button", fontSize = 18.sp)
+            Text("Login", fontSize = 18.sp)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -66,7 +66,7 @@ fun WelcomeScreen(
             shape = MaterialTheme.shapes.medium,
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
         ) {
-            Text("sign-up button", fontSize = 18.sp)
+            Text("Sign Up", fontSize = 18.sp)
         }
 
         Spacer(modifier = Modifier.height(16.dp))

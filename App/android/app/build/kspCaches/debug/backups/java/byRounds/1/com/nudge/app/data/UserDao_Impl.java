@@ -8,6 +8,7 @@ import androidx.room.CoroutinesRoom;
 import androidx.room.EntityInsertionAdapter;
 import androidx.room.RoomDatabase;
 import androidx.room.RoomSQLiteQuery;
+import androidx.room.SharedSQLiteStatement;
 import androidx.room.util.CursorUtil;
 import androidx.room.util.DBUtil;
 import androidx.sqlite.db.SupportSQLiteStatement;
@@ -32,6 +33,8 @@ public final class UserDao_Impl implements UserDao {
 
   private final EntityInsertionAdapter<User> __insertionAdapterOfUser;
 
+  private final SharedSQLiteStatement __preparedStmtOfDeleteUser;
+
   public UserDao_Impl(@NonNull final RoomDatabase __db) {
     this.__db = __db;
     this.__insertionAdapterOfUser = new EntityInsertionAdapter<User>(__db) {
@@ -49,6 +52,14 @@ public final class UserDao_Impl implements UserDao {
         statement.bindString(3, __UserRole_enumToString(entity.getRole()));
       }
     };
+    this.__preparedStmtOfDeleteUser = new SharedSQLiteStatement(__db) {
+      @Override
+      @NonNull
+      public String createQuery() {
+        final String _query = "DELETE FROM users WHERE username = ?";
+        return _query;
+      }
+    };
   }
 
   @Override
@@ -64,6 +75,31 @@ public final class UserDao_Impl implements UserDao {
           return Unit.INSTANCE;
         } finally {
           __db.endTransaction();
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
+  public Object deleteUser(final String username, final Continuation<? super Unit> $completion) {
+    return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
+      @Override
+      @NonNull
+      public Unit call() throws Exception {
+        final SupportSQLiteStatement _stmt = __preparedStmtOfDeleteUser.acquire();
+        int _argIndex = 1;
+        _stmt.bindString(_argIndex, username);
+        try {
+          __db.beginTransaction();
+          try {
+            _stmt.executeUpdateDelete();
+            __db.setTransactionSuccessful();
+            return Unit.INSTANCE;
+          } finally {
+            __db.endTransaction();
+          }
+        } finally {
+          __preparedStmtOfDeleteUser.release(_stmt);
         }
       }
     }, $completion);

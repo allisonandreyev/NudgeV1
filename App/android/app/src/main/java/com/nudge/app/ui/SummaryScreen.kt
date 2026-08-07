@@ -1,7 +1,6 @@
 package com.nudge.app.ui
 
 import android.bluetooth.BluetoothProfile
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,6 +8,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,9 +30,13 @@ fun SummaryScreen(
     onConnectWithPhysician: () -> Unit = {},
     onStartTherapy: () -> Unit = {},
     onStartMinigame: () -> Unit = {},
-    onViewPhysicianDashboard: () -> Unit = {}
+    onViewPhysicianDashboard: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {}
 ) {
-    val emgData by viewModel.emgDataHistory.collectAsState()
+    val emgDataD0 by viewModel.emgDataD0.collectAsState()
+    val emgDataD1 by viewModel.emgDataD1.collectAsState()
+    val emgDataD2 by viewModel.emgDataD2.collectAsState()
+    
     val receiveRate by viewModel.receiveFrequency.collectAsState()
     val rawLogs by viewModel.rawLogs.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
@@ -73,10 +77,13 @@ fun SummaryScreen(
                     if (userRole == UserRole.PATIENT) {
                         Text(
                             "%.1f Hz".format(receiveRate),
-                            modifier = Modifier.padding(end = 16.dp),
+                            modifier = Modifier.padding(end = 8.dp),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary
                         )
+                    }
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 }
             )
@@ -89,21 +96,30 @@ fun SummaryScreen(
                 .padding(16.dp)
         ) {
             if (userRole == UserRole.PATIENT) {
-                // Live EMG Graph Card
-                Card(
+                // Multi-Sensor EMG Graph Cards
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
-                        .padding(bottom = 16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        .weight(1f)
+                        .padding(bottom = 16.dp)
                 ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        Text("Live EMG Stream", style = MaterialTheme.typography.labelMedium)
-                        LineGraph(
-                            data = emgData,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
+                    Text(
+                        "LIVE EMG STREAMS",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    // Sensor D0
+                    SensorGraphCard(label = "Sensor D0", data = emgDataD0, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Sensor D1
+                    SensorGraphCard(label = "Sensor D1", data = emgDataD1, color = Color(0xFF4CAF50))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Sensor D2
+                    SensorGraphCard(label = "Sensor D2", data = emgDataD2, color = Color(0xFFFF9800))
                 }
 
                 // Command Input
@@ -142,7 +158,7 @@ fun SummaryScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
+                        .height(150.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.Black)
                 ) {
                     LazyColumn(
@@ -253,6 +269,36 @@ fun SummaryScreen(
             ) {
                 Text("Disconnect")
             }
+        }
+    }
+}
+
+@Composable
+fun SensorGraphCard(label: String, data: List<Float>, color: Color) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "${data.lastOrNull()?.toInt() ?: 0}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = color
+                )
+            }
+            LineGraph(
+                data = data,
+                modifier = Modifier.fillMaxSize(),
+                color = color
+            )
         }
     }
 }

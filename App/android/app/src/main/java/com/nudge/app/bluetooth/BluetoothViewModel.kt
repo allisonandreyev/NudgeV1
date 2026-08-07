@@ -30,6 +30,7 @@ class BluetoothViewModel @Inject constructor(
     private var collectionJob: Job? = null
 
     private val _currentUsername = MutableStateFlow<String?>(null)
+    private val _activeSessionId = MutableStateFlow<Long?>(null)
 
     private val _discoveredDevices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
     val discoveredDevices = _discoveredDevices.asStateFlow()
@@ -37,8 +38,15 @@ class BluetoothViewModel @Inject constructor(
     private val _connectionState = MutableStateFlow(BluetoothProfile.STATE_DISCONNECTED)
     val connectionState = _connectionState.asStateFlow()
 
-    private val _emgDataHistory = MutableStateFlow<List<Float>>(emptyList())
-    val emgDataHistory = _emgDataHistory.asStateFlow()
+    // Multi-channel data history
+    private val _emgDataD0 = MutableStateFlow<List<Float>>(emptyList())
+    val emgDataD0 = _emgDataD0.asStateFlow()
+
+    private val _emgDataD1 = MutableStateFlow<List<Float>>(emptyList())
+    val emgDataD1 = _emgDataD1.asStateFlow()
+
+    private val _emgDataD2 = MutableStateFlow<List<Float>>(emptyList())
+    val emgDataD2 = _emgDataD2.asStateFlow()
 
     private val _receiveFrequency = MutableStateFlow(0f)
     val receiveFrequency = _receiveFrequency.asStateFlow()
@@ -90,6 +98,10 @@ class BluetoothViewModel @Inject constructor(
         _currentUsername.value = username
     }
 
+    fun setActiveSession(sessionId: Long?) {
+        _activeSessionId.value = sessionId
+    }
+
     private fun handlePacket(packet: Packet) {
         if (packet.messageId == lastMessageId) {
             Log.d("BluetoothViewModel", "Ignoring duplicate packet: msgId=${packet.messageId}")
@@ -114,9 +126,8 @@ class BluetoothViewModel @Inject constructor(
         _rawLogs.update { (it + "MsgID: ${packet.messageId}, Data: ${packet.data}").takeLast(50) }
 
         // The packet.data list contains the decoded TLV values.
-        // In the firmware's loop, it appends various types.
-        // For EMG data, we expect numbers.
-        packet.data.forEach { value ->
+        // We expect up to 3 values: D0, D1, D2 in order.
+        packet.data.forEachIndexed { index, value ->
             val floatValue = when (value) {
                 is Number -> value.toFloat()
                 is UByte -> value.toFloat()
@@ -125,11 +136,18 @@ class BluetoothViewModel @Inject constructor(
                 is ULong -> value.toFloat()
                 else -> null
             }
-            if (floatValue != null) {
-                _emgDataHistory.update { (it + floatValue).takeLast(100) }
+
+            if (floatValue != null && index < 3) {
+                // Update the correct flow based on index
+                when (index) {
+                    0 -> _emgDataD0.update { (it + floatValue).takeLast(100) }
+                    1 -> _emgDataD1.update { (it + floatValue).takeLast(100) }
+                    2 -> _emgDataD2.update { (it + floatValue).takeLast(100) }
+                }
                 
                 // Persist to database
                 val username = _currentUsername.value
+                val sessionId = _activeSessionId.value
                 if (username != null) {
                     viewModelScope.launch {
                         dataPointDao.insert(
@@ -137,7 +155,9 @@ class BluetoothViewModel @Inject constructor(
                                 username = username,
                                 timestamp = System.currentTimeMillis(),
                                 value = floatValue,
-                                type = "EMG"
+                                type = "EMG",
+                                sensorId = index,
+                                sessionId = sessionId
                             )
                         )
                     }

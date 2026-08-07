@@ -17,10 +17,9 @@ fun LineGraph(
     data: List<Float>,
     modifier: Modifier = Modifier
         .fillMaxWidth()
-        .height(200.dp)
+        .height(200.dp),
+    color: Color = MaterialTheme.colorScheme.primary
 ) {
-    val color = MaterialTheme.colorScheme.primary
-    
     Canvas(modifier = modifier) {
         if (data.size < 2) return@Canvas
 

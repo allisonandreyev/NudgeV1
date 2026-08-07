@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,7 +27,7 @@ data class Pipe(
     val x: Float,
     val gapY: Float,
     val width: Float = 150f,
-    val gapHeight: Float = 400f
+    val gapHeight: Float = 450f // Slightly larger gap for easier play
 )
 
 @Composable
@@ -42,16 +43,20 @@ fun MinigameScreen(
     var score by remember { mutableStateOf(0) }
     val highScore by viewModel.highScore.collectAsState()
 
-    val gravity = 0.8f
-    val jumpImpulse = -15f
-    val pipeSpeed = 5f
+    var screenWidth by remember { mutableStateOf(1080f) }
+    var screenHeight by remember { mutableStateOf(1920f) }
+
+    // Physics Constants - Tuned to be slower and use more screen
+    val gravity = 0.34f      // 75% of previous 0.45f
+    val jumpImpulse = -9.5f  // Adjusted to match lighter gravity
+    val pipeSpeed = 3.5f
 
     LaunchedEffect(username) {
         viewModel.setUsername(username)
     }
 
     fun resetGame() {
-        birdY = 500f
+        birdY = screenHeight / 3f
         birdVelocity = 0f
         pipes = emptyList()
         score = 0
@@ -69,11 +74,11 @@ fun MinigameScreen(
                 pipes = pipes.map { it.copy(x = it.x - pipeSpeed) }
                     .filter { it.x + it.width > 0 }
 
-                // Spawn Pipes
-                if (pipes.isEmpty() || pipes.last().x < 600f) {
+                // Spawn Pipes - Dynamic based on screen width
+                if (pipes.isEmpty() || pipes.last().x < screenWidth * 0.5f) {
                     pipes = pipes + Pipe(
-                        x = 1000f,
-                        gapY = Random.nextFloat() * 600f + 200f
+                        x = screenWidth,
+                        gapY = Random.nextFloat() * (screenHeight * 0.5f) + (screenHeight * 0.25f)
                     )
                 }
 
@@ -84,11 +89,11 @@ fun MinigameScreen(
                     }
                 }
 
-                // Collision Detection
+                // Collision Detection - Uses full screen height
                 val birdRect = Offset(200f, birdY)
                 val birdSize = 30f
 
-                if (birdY < 0 || birdY > 1500f) {
+                if (birdY < 0 || birdY > screenHeight) {
                     gameState = GameState.GAME_OVER
                 }
 
@@ -115,6 +120,13 @@ fun MinigameScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF70C5CE))
+            .onSizeChanged { size ->
+                screenWidth = size.width.toFloat()
+                screenHeight = size.height.toFloat()
+                if (gameState == GameState.START) {
+                    birdY = screenHeight / 3f
+                }
+            }
             .clickable {
                 if (gameState == GameState.START) {
                     gameState = GameState.PLAYING

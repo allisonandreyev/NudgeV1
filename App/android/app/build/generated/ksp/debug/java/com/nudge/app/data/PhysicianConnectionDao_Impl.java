@@ -13,7 +13,6 @@ import androidx.room.util.DBUtil;
 import androidx.sqlite.db.SupportSQLiteStatement;
 import java.lang.Class;
 import java.lang.Exception;
-import java.lang.IllegalArgumentException;
 import java.lang.Object;
 import java.lang.Override;
 import java.lang.String;
@@ -34,9 +33,13 @@ public final class PhysicianConnectionDao_Impl implements PhysicianConnectionDao
 
   private final EntityInsertionAdapter<PhysicianConnection> __insertionAdapterOfPhysicianConnection;
 
+  private final Converters __converters = new Converters();
+
   private final EntityDeletionOrUpdateAdapter<PhysicianConnection> __updateAdapterOfPhysicianConnection;
 
   private final SharedSQLiteStatement __preparedStmtOfDeleteConnection;
+
+  private final SharedSQLiteStatement __preparedStmtOfDeleteAllConnectionsForUser;
 
   public PhysicianConnectionDao_Impl(@NonNull final RoomDatabase __db) {
     this.__db = __db;
@@ -54,9 +57,10 @@ public final class PhysicianConnectionDao_Impl implements PhysicianConnectionDao
         statement.bindString(2, entity.getPatientUsername());
         statement.bindString(3, entity.getPhysicianName());
         statement.bindLong(4, entity.getConnectionDate());
-        statement.bindString(5, __ConnectionStatus_enumToString(entity.getStatus()));
-        final int _tmp = entity.isSynced() ? 1 : 0;
-        statement.bindLong(6, _tmp);
+        final String _tmp = __converters.fromConnectionStatus(entity.getStatus());
+        statement.bindString(5, _tmp);
+        final int _tmp_1 = entity.isSynced() ? 1 : 0;
+        statement.bindLong(6, _tmp_1);
       }
     };
     this.__updateAdapterOfPhysicianConnection = new EntityDeletionOrUpdateAdapter<PhysicianConnection>(__db) {
@@ -73,9 +77,10 @@ public final class PhysicianConnectionDao_Impl implements PhysicianConnectionDao
         statement.bindString(2, entity.getPatientUsername());
         statement.bindString(3, entity.getPhysicianName());
         statement.bindLong(4, entity.getConnectionDate());
-        statement.bindString(5, __ConnectionStatus_enumToString(entity.getStatus()));
-        final int _tmp = entity.isSynced() ? 1 : 0;
-        statement.bindLong(6, _tmp);
+        final String _tmp = __converters.fromConnectionStatus(entity.getStatus());
+        statement.bindString(5, _tmp);
+        final int _tmp_1 = entity.isSynced() ? 1 : 0;
+        statement.bindLong(6, _tmp_1);
         statement.bindString(7, entity.getPhysicianEmail());
         statement.bindString(8, entity.getPatientUsername());
       }
@@ -85,6 +90,14 @@ public final class PhysicianConnectionDao_Impl implements PhysicianConnectionDao
       @NonNull
       public String createQuery() {
         final String _query = "DELETE FROM physician_connections WHERE physicianEmail = ? AND patientUsername = ?";
+        return _query;
+      }
+    };
+    this.__preparedStmtOfDeleteAllConnectionsForUser = new SharedSQLiteStatement(__db) {
+      @Override
+      @NonNull
+      public String createQuery() {
+        final String _query = "DELETE FROM physician_connections WHERE patientUsername = ? OR physicianEmail = ?";
         return _query;
       }
     };
@@ -157,6 +170,34 @@ public final class PhysicianConnectionDao_Impl implements PhysicianConnectionDao
   }
 
   @Override
+  public Object deleteAllConnectionsForUser(final String username,
+      final Continuation<? super Unit> $completion) {
+    return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
+      @Override
+      @NonNull
+      public Unit call() throws Exception {
+        final SupportSQLiteStatement _stmt = __preparedStmtOfDeleteAllConnectionsForUser.acquire();
+        int _argIndex = 1;
+        _stmt.bindString(_argIndex, username);
+        _argIndex = 2;
+        _stmt.bindString(_argIndex, username);
+        try {
+          __db.beginTransaction();
+          try {
+            _stmt.executeUpdateDelete();
+            __db.setTransactionSuccessful();
+            return Unit.INSTANCE;
+          } finally {
+            __db.endTransaction();
+          }
+        } finally {
+          __preparedStmtOfDeleteAllConnectionsForUser.release(_stmt);
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
   public Flow<List<PhysicianConnection>> getConnectionsForPatient(final String patientUsername) {
     final String _sql = "SELECT * FROM physician_connections WHERE patientUsername = ? ORDER BY connectionDate DESC";
     final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
@@ -186,11 +227,13 @@ public final class PhysicianConnectionDao_Impl implements PhysicianConnectionDao
             final long _tmpConnectionDate;
             _tmpConnectionDate = _cursor.getLong(_cursorIndexOfConnectionDate);
             final ConnectionStatus _tmpStatus;
-            _tmpStatus = __ConnectionStatus_stringToEnum(_cursor.getString(_cursorIndexOfStatus));
+            final String _tmp;
+            _tmp = _cursor.getString(_cursorIndexOfStatus);
+            _tmpStatus = __converters.toConnectionStatus(_tmp);
             final boolean _tmpIsSynced;
-            final int _tmp;
-            _tmp = _cursor.getInt(_cursorIndexOfIsSynced);
-            _tmpIsSynced = _tmp != 0;
+            final int _tmp_1;
+            _tmp_1 = _cursor.getInt(_cursorIndexOfIsSynced);
+            _tmpIsSynced = _tmp_1 != 0;
             _item = new PhysicianConnection(_tmpPhysicianEmail,_tmpPatientUsername,_tmpPhysicianName,_tmpConnectionDate,_tmpStatus,_tmpIsSynced);
             _result.add(_item);
           }
@@ -237,11 +280,13 @@ public final class PhysicianConnectionDao_Impl implements PhysicianConnectionDao
             final long _tmpConnectionDate;
             _tmpConnectionDate = _cursor.getLong(_cursorIndexOfConnectionDate);
             final ConnectionStatus _tmpStatus;
-            _tmpStatus = __ConnectionStatus_stringToEnum(_cursor.getString(_cursorIndexOfStatus));
+            final String _tmp;
+            _tmp = _cursor.getString(_cursorIndexOfStatus);
+            _tmpStatus = __converters.toConnectionStatus(_tmp);
             final boolean _tmpIsSynced;
-            final int _tmp;
-            _tmp = _cursor.getInt(_cursorIndexOfIsSynced);
-            _tmpIsSynced = _tmp != 0;
+            final int _tmp_1;
+            _tmp_1 = _cursor.getInt(_cursorIndexOfIsSynced);
+            _tmpIsSynced = _tmp_1 != 0;
             _item = new PhysicianConnection(_tmpPhysicianEmail,_tmpPatientUsername,_tmpPhysicianName,_tmpConnectionDate,_tmpStatus,_tmpIsSynced);
             _result.add(_item);
           }
@@ -261,23 +306,5 @@ public final class PhysicianConnectionDao_Impl implements PhysicianConnectionDao
   @NonNull
   public static List<Class<?>> getRequiredConverters() {
     return Collections.emptyList();
-  }
-
-  private String __ConnectionStatus_enumToString(@NonNull final ConnectionStatus _value) {
-    switch (_value) {
-      case PENDING: return "PENDING";
-      case ACCEPTED: return "ACCEPTED";
-      case REJECTED: return "REJECTED";
-      default: throw new IllegalArgumentException("Can't convert enum to string, unknown enum value: " + _value);
-    }
-  }
-
-  private ConnectionStatus __ConnectionStatus_stringToEnum(@NonNull final String _value) {
-    switch (_value) {
-      case "PENDING": return ConnectionStatus.PENDING;
-      case "ACCEPTED": return ConnectionStatus.ACCEPTED;
-      case "REJECTED": return ConnectionStatus.REJECTED;
-      default: throw new IllegalArgumentException("Can't convert value to enum, unknown value: " + _value);
-    }
   }
 }

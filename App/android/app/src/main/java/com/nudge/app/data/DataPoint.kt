@@ -10,5 +10,7 @@ data class DataPoint(
     val timestamp: Long,
     val value: Float,
     val type: String,
+    val sensorId: Int = 0, // 0 for D0, 1 for D1, 2 for D2
+    val sessionId: Long? = null, // Linked therapy session
     val isSynced: Boolean = false
 )

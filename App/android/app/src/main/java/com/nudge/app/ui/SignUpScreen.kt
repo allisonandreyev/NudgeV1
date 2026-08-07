@@ -100,7 +100,7 @@ fun SignUpScreen(
                 username = it
                 errorMessage = null
             },
-            label = { Text("sign up username text box") },
+            label = { Text("Username") },
             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -115,7 +115,7 @@ fun SignUpScreen(
                 password = it
                 errorMessage = null
             },
-            label = { Text("create password text box") },
+            label = { Text("Password") },
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -132,7 +132,7 @@ fun SignUpScreen(
                 confirmPassword = it
                 errorMessage = null
             },
-            label = { Text("confirm password text box") },
+            label = { Text("Confirm Password") },
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),

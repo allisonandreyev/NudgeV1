@@ -105,7 +105,7 @@ fun LoginScreen(
                 username = it
                 errorMessage = null
             },
-            label = { Text("login username text box") },
+            label = { Text("Username") },
             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -124,7 +124,7 @@ fun LoginScreen(
                 password = it
                 errorMessage = null
             },
-            label = { Text("login password text box") },
+            label = { Text("Password") },
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -169,7 +169,7 @@ fun LoginScreen(
         }
         
         TextButton(onClick = onForgotPassword) {
-            Text("forgot password", color = MaterialTheme.colorScheme.onSurface)
+            Text("Forgot Password?", color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
