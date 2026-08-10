@@ -308,3 +308,4 @@ styleable NavHost navGraph
 styleable NavInclude graph
 styleable Navigator android_label android_id route
 xml backup_rules
+xml provider_paths

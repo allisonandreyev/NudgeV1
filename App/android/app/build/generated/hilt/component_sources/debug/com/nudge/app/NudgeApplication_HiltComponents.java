@@ -6,6 +6,7 @@ import com.nudge.app.ui.AuthViewModel_HiltModules;
 import com.nudge.app.ui.MinigameViewModel_HiltModules;
 import com.nudge.app.ui.PhysicianViewModel_HiltModules;
 import com.nudge.app.ui.TherapyViewModel_HiltModules;
+import com.nudge.app.ui.TrainingViewModel_HiltModules;
 import dagger.Binds;
 import dagger.Component;
 import dagger.Module;
@@ -165,7 +166,8 @@ public final class NudgeApplication_HiltComponents {
           ActivityCBuilderModule.class,
           ViewModelCBuilderModule.class,
           PhysicianViewModel_HiltModules.KeyModule.class,
-          TherapyViewModel_HiltModules.KeyModule.class
+          TherapyViewModel_HiltModules.KeyModule.class,
+          TrainingViewModel_HiltModules.KeyModule.class
       }
   )
   @ActivityRetainedScoped
@@ -206,7 +208,8 @@ public final class NudgeApplication_HiltComponents {
           HiltWrapper_HiltViewModelFactory_ViewModelModule.class,
           MinigameViewModel_HiltModules.BindsModule.class,
           PhysicianViewModel_HiltModules.BindsModule.class,
-          TherapyViewModel_HiltModules.BindsModule.class
+          TherapyViewModel_HiltModules.BindsModule.class,
+          TrainingViewModel_HiltModules.BindsModule.class
       }
   )
   @ViewModelScoped

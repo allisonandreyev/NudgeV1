@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -32,6 +33,7 @@ fun SummaryScreen(
     onConnectWithPhysician: () -> Unit = {},
     onStartTherapy: () -> Unit = {},
     onStartMinigame: () -> Unit = {},
+    onStartTraining: () -> Unit = {},
     onViewPhysicianDashboard: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {}
 ) {
@@ -248,6 +250,19 @@ fun SummaryScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (userRole == UserRole.PATIENT) {
+                        // Test User Special Button
+                        if (username == "test_user") {
+                            Button(
+                                onClick = onStartTraining,
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Icon(Icons.Default.Psychology, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Start Automated Training", fontWeight = FontWeight.Bold)
+                            }
+                        }
+
                         Button(
                             onClick = onStartTherapy,
                             modifier = Modifier.weight(1f),

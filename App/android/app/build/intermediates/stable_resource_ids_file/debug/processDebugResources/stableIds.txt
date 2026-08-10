@@ -1,3 +1,4 @@
+com.nudge.app:xml/provider_paths = 0x7f0d0001
 com.nudge.app:styleable/NavGraphNavigator = 0x7f0c000c
 com.nudge.app:styleable/GradientColorItem = 0x7f0c0008
 com.nudge.app:styleable/GradientColor = 0x7f0c0007

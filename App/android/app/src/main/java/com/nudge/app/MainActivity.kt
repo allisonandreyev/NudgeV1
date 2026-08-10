@@ -27,6 +27,7 @@ import com.nudge.app.data.UserRole
 import com.nudge.app.ui.ConnectPhysicianScreen
 import com.nudge.app.ui.DeviceSelectScreen
 import com.nudge.app.ui.ForgotPasswordScreen
+import com.nudge.app.ui.AutomatedTrainingScreen
 import com.nudge.app.ui.LoginScreen
 import com.nudge.app.ui.MinigameScreen
 import com.nudge.app.ui.PatientDetailScreen
@@ -150,6 +151,9 @@ fun NudgeApp() {
                 onViewPhysicianDashboard = {
                     navController.navigate("physician_dashboard")
                 },
+                onStartTraining = {
+                    navController.navigate("training")
+                },
                 onNavigateToSettings = {
                     navController.navigate("settings")
                 }
@@ -192,6 +196,12 @@ fun NudgeApp() {
                 onNavigateToSessionDetail = { sessionId ->
                     navController.navigate("session_detail/$sessionId")
                 }
+            )
+        }
+        composable("training") {
+            AutomatedTrainingScreen(
+                username = currentUsername ?: "guest",
+                onBack = { navController.popBackStack() }
             )
         }
         composable("session_detail/{sessionId}") { backStackEntry ->

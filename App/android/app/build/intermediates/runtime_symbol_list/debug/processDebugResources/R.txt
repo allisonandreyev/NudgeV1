@@ -380,3 +380,4 @@ int styleable Navigator_android_label 0
 int styleable Navigator_android_id 1
 int styleable Navigator_route 2
 int xml backup_rules 0x7f0d0000
+int xml provider_paths 0x7f0d0001

@@ -28,6 +28,8 @@ import com.nudge.app.ui.PhysicianViewModel;
 import com.nudge.app.ui.PhysicianViewModel_HiltModules;
 import com.nudge.app.ui.TherapyViewModel;
 import com.nudge.app.ui.TherapyViewModel_HiltModules;
+import com.nudge.app.ui.TrainingViewModel;
+import com.nudge.app.ui.TrainingViewModel_HiltModules;
 import dagger.hilt.android.ActivityRetainedLifecycle;
 import dagger.hilt.android.ViewModelLifecycle;
 import dagger.hilt.android.internal.builders.ActivityComponentBuilder;
@@ -388,7 +390,7 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
 
     @Override
     public Map<Class<?>, Boolean> getViewModelKeys() {
-      return LazyClassKeyMap.<Boolean>of(MapBuilder.<String, Boolean>newMapBuilder(5).put(LazyClassKeyProvider.com_nudge_app_ui_AuthViewModel, AuthViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_nudge_app_bluetooth_BluetoothViewModel, BluetoothViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_nudge_app_ui_MinigameViewModel, MinigameViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_nudge_app_ui_PhysicianViewModel, PhysicianViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_nudge_app_ui_TherapyViewModel, TherapyViewModel_HiltModules.KeyModule.provide()).build());
+      return LazyClassKeyMap.<Boolean>of(MapBuilder.<String, Boolean>newMapBuilder(6).put(LazyClassKeyProvider.com_nudge_app_ui_AuthViewModel, AuthViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_nudge_app_bluetooth_BluetoothViewModel, BluetoothViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_nudge_app_ui_MinigameViewModel, MinigameViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_nudge_app_ui_PhysicianViewModel, PhysicianViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_nudge_app_ui_TherapyViewModel, TherapyViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_nudge_app_ui_TrainingViewModel, TrainingViewModel_HiltModules.KeyModule.provide()).build());
     }
 
     @Override
@@ -408,30 +410,35 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
 
     @IdentifierNameString
     private static final class LazyClassKeyProvider {
-      static String com_nudge_app_bluetooth_BluetoothViewModel = "com.nudge.app.bluetooth.BluetoothViewModel";
-
-      static String com_nudge_app_ui_PhysicianViewModel = "com.nudge.app.ui.PhysicianViewModel";
-
-      static String com_nudge_app_ui_TherapyViewModel = "com.nudge.app.ui.TherapyViewModel";
+      static String com_nudge_app_ui_AuthViewModel = "com.nudge.app.ui.AuthViewModel";
 
       static String com_nudge_app_ui_MinigameViewModel = "com.nudge.app.ui.MinigameViewModel";
 
-      static String com_nudge_app_ui_AuthViewModel = "com.nudge.app.ui.AuthViewModel";
+      static String com_nudge_app_bluetooth_BluetoothViewModel = "com.nudge.app.bluetooth.BluetoothViewModel";
+
+      static String com_nudge_app_ui_TrainingViewModel = "com.nudge.app.ui.TrainingViewModel";
+
+      static String com_nudge_app_ui_TherapyViewModel = "com.nudge.app.ui.TherapyViewModel";
+
+      static String com_nudge_app_ui_PhysicianViewModel = "com.nudge.app.ui.PhysicianViewModel";
 
       @KeepFieldType
-      BluetoothViewModel com_nudge_app_bluetooth_BluetoothViewModel2;
-
-      @KeepFieldType
-      PhysicianViewModel com_nudge_app_ui_PhysicianViewModel2;
-
-      @KeepFieldType
-      TherapyViewModel com_nudge_app_ui_TherapyViewModel2;
+      AuthViewModel com_nudge_app_ui_AuthViewModel2;
 
       @KeepFieldType
       MinigameViewModel com_nudge_app_ui_MinigameViewModel2;
 
       @KeepFieldType
-      AuthViewModel com_nudge_app_ui_AuthViewModel2;
+      BluetoothViewModel com_nudge_app_bluetooth_BluetoothViewModel2;
+
+      @KeepFieldType
+      TrainingViewModel com_nudge_app_ui_TrainingViewModel2;
+
+      @KeepFieldType
+      TherapyViewModel com_nudge_app_ui_TherapyViewModel2;
+
+      @KeepFieldType
+      PhysicianViewModel com_nudge_app_ui_PhysicianViewModel2;
     }
   }
 
@@ -452,6 +459,8 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
 
     private Provider<TherapyViewModel> therapyViewModelProvider;
 
+    private Provider<TrainingViewModel> trainingViewModelProvider;
+
     private ViewModelCImpl(SingletonCImpl singletonCImpl,
         ActivityRetainedCImpl activityRetainedCImpl, SavedStateHandle savedStateHandleParam,
         ViewModelLifecycle viewModelLifecycleParam) {
@@ -470,11 +479,12 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
       this.minigameViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 2);
       this.physicianViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 3);
       this.therapyViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 4);
+      this.trainingViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 5);
     }
 
     @Override
     public Map<Class<?>, javax.inject.Provider<ViewModel>> getHiltViewModelMap() {
-      return LazyClassKeyMap.<javax.inject.Provider<ViewModel>>of(MapBuilder.<String, javax.inject.Provider<ViewModel>>newMapBuilder(5).put(LazyClassKeyProvider.com_nudge_app_ui_AuthViewModel, ((Provider) authViewModelProvider)).put(LazyClassKeyProvider.com_nudge_app_bluetooth_BluetoothViewModel, ((Provider) bluetoothViewModelProvider)).put(LazyClassKeyProvider.com_nudge_app_ui_MinigameViewModel, ((Provider) minigameViewModelProvider)).put(LazyClassKeyProvider.com_nudge_app_ui_PhysicianViewModel, ((Provider) physicianViewModelProvider)).put(LazyClassKeyProvider.com_nudge_app_ui_TherapyViewModel, ((Provider) therapyViewModelProvider)).build());
+      return LazyClassKeyMap.<javax.inject.Provider<ViewModel>>of(MapBuilder.<String, javax.inject.Provider<ViewModel>>newMapBuilder(6).put(LazyClassKeyProvider.com_nudge_app_ui_AuthViewModel, ((Provider) authViewModelProvider)).put(LazyClassKeyProvider.com_nudge_app_bluetooth_BluetoothViewModel, ((Provider) bluetoothViewModelProvider)).put(LazyClassKeyProvider.com_nudge_app_ui_MinigameViewModel, ((Provider) minigameViewModelProvider)).put(LazyClassKeyProvider.com_nudge_app_ui_PhysicianViewModel, ((Provider) physicianViewModelProvider)).put(LazyClassKeyProvider.com_nudge_app_ui_TherapyViewModel, ((Provider) therapyViewModelProvider)).put(LazyClassKeyProvider.com_nudge_app_ui_TrainingViewModel, ((Provider) trainingViewModelProvider)).build());
     }
 
     @Override
@@ -484,21 +494,20 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
 
     @IdentifierNameString
     private static final class LazyClassKeyProvider {
-      static String com_nudge_app_ui_MinigameViewModel = "com.nudge.app.ui.MinigameViewModel";
-
-      static String com_nudge_app_bluetooth_BluetoothViewModel = "com.nudge.app.bluetooth.BluetoothViewModel";
+      static String com_nudge_app_ui_TherapyViewModel = "com.nudge.app.ui.TherapyViewModel";
 
       static String com_nudge_app_ui_AuthViewModel = "com.nudge.app.ui.AuthViewModel";
 
       static String com_nudge_app_ui_PhysicianViewModel = "com.nudge.app.ui.PhysicianViewModel";
 
-      static String com_nudge_app_ui_TherapyViewModel = "com.nudge.app.ui.TherapyViewModel";
+      static String com_nudge_app_bluetooth_BluetoothViewModel = "com.nudge.app.bluetooth.BluetoothViewModel";
+
+      static String com_nudge_app_ui_MinigameViewModel = "com.nudge.app.ui.MinigameViewModel";
+
+      static String com_nudge_app_ui_TrainingViewModel = "com.nudge.app.ui.TrainingViewModel";
 
       @KeepFieldType
-      MinigameViewModel com_nudge_app_ui_MinigameViewModel2;
-
-      @KeepFieldType
-      BluetoothViewModel com_nudge_app_bluetooth_BluetoothViewModel2;
+      TherapyViewModel com_nudge_app_ui_TherapyViewModel2;
 
       @KeepFieldType
       AuthViewModel com_nudge_app_ui_AuthViewModel2;
@@ -507,7 +516,13 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
       PhysicianViewModel com_nudge_app_ui_PhysicianViewModel2;
 
       @KeepFieldType
-      TherapyViewModel com_nudge_app_ui_TherapyViewModel2;
+      BluetoothViewModel com_nudge_app_bluetooth_BluetoothViewModel2;
+
+      @KeepFieldType
+      MinigameViewModel com_nudge_app_ui_MinigameViewModel2;
+
+      @KeepFieldType
+      TrainingViewModel com_nudge_app_ui_TrainingViewModel2;
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {
@@ -545,6 +560,9 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
 
           case 4: // com.nudge.app.ui.TherapyViewModel 
           return (T) new TherapyViewModel(singletonCImpl.therapySessionDao());
+
+          case 5: // com.nudge.app.ui.TrainingViewModel 
+          return (T) new TrainingViewModel(singletonCImpl.dataPointDao());
 
           default: throw new AssertionError(id);
         }

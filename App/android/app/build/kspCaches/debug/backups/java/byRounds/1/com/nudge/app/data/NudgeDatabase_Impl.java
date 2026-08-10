@@ -39,16 +39,16 @@ public final class NudgeDatabase_Impl extends NudgeDatabase {
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(6) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(7) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
-        db.execSQL("CREATE TABLE IF NOT EXISTS `data_points` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `username` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `value` REAL NOT NULL, `type` TEXT NOT NULL, `sensorId` INTEGER NOT NULL, `sessionId` INTEGER, `isSynced` INTEGER NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `data_points` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `username` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `value` REAL NOT NULL, `type` TEXT NOT NULL, `sensorId` INTEGER NOT NULL, `sessionId` INTEGER, `label` TEXT, `isSynced` INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS `physician_connections` (`physicianEmail` TEXT NOT NULL, `patientUsername` TEXT NOT NULL, `physicianName` TEXT NOT NULL, `connectionDate` INTEGER NOT NULL, `status` TEXT NOT NULL, `isSynced` INTEGER NOT NULL, PRIMARY KEY(`physicianEmail`, `patientUsername`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `user_stats` (`username` TEXT NOT NULL, `highScore` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, PRIMARY KEY(`username`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `users` (`username` TEXT NOT NULL, `passwordHash` TEXT NOT NULL, `role` TEXT NOT NULL, PRIMARY KEY(`username`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `therapy_sessions` (`sessionId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `username` TEXT NOT NULL, `startTime` INTEGER NOT NULL, `endTime` INTEGER, `restPosition` TEXT NOT NULL, `isUploaded` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '562c6ad067ea600042110b90885b3e85')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9aae24cddfea2a0457713f158dd21797')");
       }
 
       @Override
@@ -101,7 +101,7 @@ public final class NudgeDatabase_Impl extends NudgeDatabase {
       @NonNull
       public RoomOpenHelper.ValidationResult onValidateSchema(
           @NonNull final SupportSQLiteDatabase db) {
-        final HashMap<String, TableInfo.Column> _columnsDataPoints = new HashMap<String, TableInfo.Column>(8);
+        final HashMap<String, TableInfo.Column> _columnsDataPoints = new HashMap<String, TableInfo.Column>(9);
         _columnsDataPoints.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsDataPoints.put("username", new TableInfo.Column("username", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsDataPoints.put("timestamp", new TableInfo.Column("timestamp", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
@@ -109,6 +109,7 @@ public final class NudgeDatabase_Impl extends NudgeDatabase {
         _columnsDataPoints.put("type", new TableInfo.Column("type", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsDataPoints.put("sensorId", new TableInfo.Column("sensorId", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsDataPoints.put("sessionId", new TableInfo.Column("sessionId", "INTEGER", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsDataPoints.put("label", new TableInfo.Column("label", "TEXT", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsDataPoints.put("isSynced", new TableInfo.Column("isSynced", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         final HashSet<TableInfo.ForeignKey> _foreignKeysDataPoints = new HashSet<TableInfo.ForeignKey>(0);
         final HashSet<TableInfo.Index> _indicesDataPoints = new HashSet<TableInfo.Index>(0);
@@ -180,7 +181,7 @@ public final class NudgeDatabase_Impl extends NudgeDatabase {
         }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "562c6ad067ea600042110b90885b3e85", "c7afffb8bb28695adf3ae92574fec532");
+    }, "9aae24cddfea2a0457713f158dd21797", "1985801e6a6f012ec1f0ef120ce3e7c6");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;

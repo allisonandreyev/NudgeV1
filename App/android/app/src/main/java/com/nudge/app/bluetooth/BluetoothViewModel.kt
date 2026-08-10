@@ -31,6 +31,7 @@ class BluetoothViewModel @Inject constructor(
 
     private val _currentUsername = MutableStateFlow<String?>(null)
     private val _activeSessionId = MutableStateFlow<Long?>(null)
+    private val _activeLabel = MutableStateFlow<String?>(null)
 
     private val _discoveredDevices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
     val discoveredDevices = _discoveredDevices.asStateFlow()
@@ -102,6 +103,10 @@ class BluetoothViewModel @Inject constructor(
         _activeSessionId.value = sessionId
     }
 
+    fun setActiveLabel(label: String?) {
+        _activeLabel.value = label
+    }
+
     private fun handlePacket(packet: Packet) {
         if (packet.messageId == lastMessageId) {
             Log.d("BluetoothViewModel", "Ignoring duplicate packet: msgId=${packet.messageId}")
@@ -148,6 +153,8 @@ class BluetoothViewModel @Inject constructor(
                 // Persist to database
                 val username = _currentUsername.value
                 val sessionId = _activeSessionId.value
+                val label = _activeLabel.value
+
                 if (username != null) {
                     viewModelScope.launch {
                         dataPointDao.insert(
@@ -157,7 +164,8 @@ class BluetoothViewModel @Inject constructor(
                                 value = floatValue,
                                 type = "EMG",
                                 sensorId = index,
-                                sessionId = sessionId
+                                sessionId = sessionId,
+                                label = label
                             )
                         )
                     }

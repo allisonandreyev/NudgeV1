@@ -22,4 +22,10 @@ interface DataPointDao {
 
     @Query("DELETE FROM data_points WHERE username = :username")
     suspend fun deleteDataForUser(username: String)
+
+    @Query("SELECT * FROM data_points WHERE label IS NOT NULL AND username = :username ORDER BY timestamp ASC")
+    fun getLabeledDataForUser(username: String): Flow<List<DataPoint>>
+
+    @Query("DELETE FROM data_points WHERE label IS NOT NULL AND username = :username")
+    suspend fun clearTrainingData(username: String)
 }
