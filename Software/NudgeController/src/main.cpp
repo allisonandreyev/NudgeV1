@@ -26,6 +26,9 @@ void setup()
 
       Serial.print("Received: ");
       Serial.println(message.c_str());
+
+      // Parse and execute servo commands
+      ServoController::ParseCommand(String(message.c_str()));
     }
   });
 
@@ -37,10 +40,14 @@ void setup()
 // uint8_t c = 0;
 void loop()
 {
+  // Automatic testing disabled to allow manual BLE commands
+  /*
   ServoController::SetServo(0, 260, 200);
   delay(5000);
   ServoController::SetServo(0, 0, 200);
   delay(5000);
+  */
+
   // Read data
   // Pass data to tinyML
   // Read tinyML response

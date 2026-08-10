@@ -43,12 +43,22 @@ fun LineGraph(
         drawPath(
             path = path,
             color = color,
-            style = Stroke(width = 3.dp.toPx())
+            style = Stroke(width = 2.dp.toPx()) // Slightly thinner for cleaner look
         )
         
-        // Optional: Draw a base line
+        // Transparent base area
+        drawPath(
+            path = path.apply {
+                lineTo(width, height)
+                lineTo(0f, height)
+                close()
+            },
+            color = color.copy(alpha = 0.1f)
+        )
+        
+        // Base line
         drawLine(
-            color = Color.Gray.copy(alpha = 0.5f),
+            color = Color.White.copy(alpha = 0.1f),
             start = Offset(0f, height),
             end = Offset(width, height),
             strokeWidth = 1.dp.toPx()

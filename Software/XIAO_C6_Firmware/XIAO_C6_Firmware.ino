@@ -1,16 +1,15 @@
 /**
  * Nudge Wearable Firmware - XIAO ESP32-C6
  * Triple EMG Sensor Stream (D0, D1, D2)
+ * Remote Servo Control (0-15)
  * Using Custom Binary TLV Protocol
- *
- * Target: XIAO ESP32-C6
- * Pins: D0 (Sensor 1), D1 (Sensor 2), D2 (Sensor 3)
  */
 
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
+#include "ServoController.h"
 
 // UUIDs - MUST MATCH ANDROID APP
 #define SERVICE_UUID        "000B1E53-D47A-CEDE-DE57-000000008488"
@@ -43,8 +42,10 @@ class MyCallbacks: public BLECharacteristicCallbacks {
       String value = pCharacteristic->getValue();
       if (value.length() > 0) {
         Serial.print("Command Received: ");
-        for (int i = 0; i < value.length(); i++) Serial.print(value[i]);
-        Serial.println();
+        Serial.println(value);
+
+        // Process servo commands (e.g., "Servo 0 180 50")
+        ServoController::ParseCommand(value);
       }
     }
 };
@@ -52,6 +53,9 @@ class MyCallbacks: public BLECharacteristicCallbacks {
 void setup() {
   Serial.begin(115200);
   analogReadResolution(12); // XIAO C6 is 12-bit (0-4095)
+
+  // Initialize Servo Controller
+  ServoController::Init();
 
   BLEDevice::init("Nudge-C6");
   pServer = BLEDevice::createServer();
@@ -76,7 +80,7 @@ void setup() {
   pService->start();
   BLEDevice::getAdvertising()->addServiceUUID(SERVICE_UUID);
   pServer->getAdvertising()->start();
-  Serial.println(">> Nudge C6 Ready. Waiting for App...");
+  Serial.println(">> Nudge Ready (Sensors + Servos)");
 }
 
 void loop() {

@@ -1,6 +1,7 @@
 package com.nudge.app.ui
 
 import android.bluetooth.BluetoothProfile
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nudge.app.bluetooth.BluetoothViewModel
 import com.nudge.app.data.UserRole
+import com.nudge.app.ui.theme.MedicalGradient
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,7 +60,8 @@ fun SummaryScreen(
                         Text(
                             text = if (userRole == UserRole.PATIENT) "ESP32 Debug Console" else "Clinical Hub",
                             fontWeight = FontWeight.Bold, 
-                            fontSize = 18.sp
+                            fontSize = 18.sp,
+                            color = Color.White
                         )
                         if (userRole == UserRole.PATIENT) {
                             Text(
@@ -83,191 +86,216 @@ fun SummaryScreen(
                         )
                     }
                     IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
-        }
+        },
+        containerColor = Color.Transparent
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
-                .padding(16.dp)
+                .background(brush = MedicalGradient)
+                .padding(padding)
         ) {
-            if (userRole == UserRole.PATIENT) {
-                // Multi-Sensor EMG Graph Cards
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(bottom = 16.dp)
-                ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                if (userRole == UserRole.PATIENT) {
+                    // Multi-Sensor EMG Graph Cards
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(bottom = 16.dp)
+                    ) {
+                        Text(
+                            "LIVE EMG STREAMS",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        // Sensor D0
+                        SensorGraphCard(label = "Sensor D0", data = emgDataD0, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // Sensor D1
+                        SensorGraphCard(label = "Sensor D1", data = emgDataD1, color = Color(0xFF00E676)) // Neon Green
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // Sensor D2
+                        SensorGraphCard(label = "Sensor D2", data = emgDataD2, color = Color(0xFFFF9100)) // Neon Orange
+                    }
+
+                    // Command Input
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = commandText,
+                            onValueChange = { commandText = it },
+                            label = { Text("Send Command") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedLabelColor = Color.White.copy(alpha = 0.5f),
+                                unfocusedTextColor = Color.White,
+                                focusedTextColor = Color.White
+                            )
+                        )
+                        IconButton(
+                            onClick = {
+                                viewModel.sendCommand(commandText)
+                                commandText = ""
+                            },
+                            modifier = Modifier.padding(start = 8.dp)
+                        ) {
+                            Icon(Icons.Default.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+
                     Text(
-                        "LIVE EMG STREAMS",
+                        "RAW INCOMING DATA",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    
-                    // Sensor D0
-                    SensorGraphCard(label = "Sensor D0", data = emgDataD0, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Sensor D1
-                    SensorGraphCard(label = "Sensor D1", data = emgDataD1, color = Color(0xFF4CAF50))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Sensor D2
-                    SensorGraphCard(label = "Sensor D2", data = emgDataD2, color = Color(0xFFFF9800))
-                }
 
-                // Command Input
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = commandText,
-                        onValueChange = { commandText = it },
-                        label = { Text("Send Command") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                    IconButton(
-                        onClick = {
-                            viewModel.sendCommand(commandText)
-                            commandText = ""
-                        },
-                        modifier = Modifier.padding(start = 8.dp)
-                    ) {
-                        Icon(Icons.Default.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
-                    }
-                }
-
-                Text(
-                    "RAW INCOMING DATA",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                // Raw Logs Console
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Black)
-                ) {
-                    LazyColumn(
-                        state = listState,
+                    // Raw Logs Console
+                    Card(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(8.dp)
+                            .fillMaxWidth()
+                            .height(150.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
                     ) {
-                        if (rawLogs.isEmpty()) {
-                            item {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp)
+                        ) {
+                            if (rawLogs.isEmpty()) {
+                                item {
+                                    Text(
+                                        "No data received yet. Waiting for packets...",
+                                        color = Color.Gray,
+                                        modifier = Modifier.padding(8.dp)
+                                    )
+                                }
+                            }
+                            items(rawLogs) { log ->
                                 Text(
-                                    "No data received yet. Waiting for packets...",
-                                    color = Color.Gray,
-                                    modifier = Modifier.padding(8.dp)
+                                    text = "> $log",
+                                    color = Color.Green,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(vertical = 2.dp)
                                 )
                             }
                         }
-                        items(rawLogs) { log ->
+                    }
+                } else {
+                    // Physician Landing View
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                modifier = Modifier.size(100.dp),
+                                tint = Color.White.copy(alpha = 0.3f)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "> $log",
-                                color = Color.Green,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(vertical = 2.dp)
+                                text = "Welcome, Dr. $username",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Select 'View Patient Dashboard' below to manage your connections.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(16.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
                         }
                     }
                 }
-            } else {
-                // Physician Landing View
-                Box(
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Navigation Buttons
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(100.dp),
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Welcome, Dr. $username",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Select 'View Patient Dashboard' below to manage your connections.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Gray,
-                            modifier = Modifier.padding(16.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
+                    if (userRole == UserRole.PATIENT) {
+                        Button(
+                            onClick = onStartTherapy,
+                            modifier = Modifier.weight(1f),
+                            shape = MaterialTheme.shapes.medium,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f))
+                        ) {
+                            Text("Therapy", fontSize = 12.sp, color = Color.White)
+                        }
+                        Button(
+                            onClick = onStartMinigame,
+                            modifier = Modifier.weight(1f),
+                            shape = MaterialTheme.shapes.medium,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f))
+                        ) {
+                            Text("Game", fontSize = 12.sp, color = Color.White)
+                        }
+                        Button(
+                            onClick = onConnectWithPhysician,
+                            modifier = Modifier.weight(1f),
+                            shape = MaterialTheme.shapes.medium,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f))
+                        ) {
+                            Text("Physician", fontSize = 12.sp, color = Color.White)
+                        }
+                    } else {
+                        // Physician View
+                        Button(
+                            onClick = onViewPhysicianDashboard,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
+                        ) {
+                            Text("View Patient Dashboard", fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary)
+                        }
                     }
                 }
-            }
-
-            // Navigation Buttons
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (userRole == UserRole.PATIENT) {
-                    Button(
-                        onClick = onStartTherapy,
-                        modifier = Modifier.weight(1f),
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Text("Therapy", fontSize = 12.sp)
-                    }
-                    Button(
-                        onClick = onStartMinigame,
-                        modifier = Modifier.weight(1f),
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Text("Game", fontSize = 12.sp)
-                    }
-                    Button(
-                        onClick = onConnectWithPhysician,
-                        modifier = Modifier.weight(1f),
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Text("Physician", fontSize = 12.sp)
-                    }
-                } else {
-                    // Physician View
-                    Button(
-                        onClick = onViewPhysicianDashboard,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Text("View Patient Dashboard", fontSize = 16.sp)
-                    }
+                
+                Button(
+                    onClick = { viewModel.disconnect() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.2f)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f))
+                ) {
+                    Text("Disconnect Wearable", color = Color.White)
                 }
-            }
-            
-            Button(
-                onClick = { viewModel.disconnect() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-            ) {
-                Text("Disconnect")
             }
         }
     }
@@ -279,7 +307,8 @@ fun SensorGraphCard(label: String, data: List<Float>, color: Color) {
         modifier = Modifier
             .fillMaxWidth()
             .height(120.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             Row(
@@ -287,11 +316,12 @@ fun SensorGraphCard(label: String, data: List<Float>, color: Color) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.7f))
                 Text(
                     text = "${data.lastOrNull()?.toInt() ?: 0}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = color
+                    color = color,
+                    fontWeight = FontWeight.ExtraBold
                 )
             }
             LineGraph(

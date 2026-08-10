@@ -1,5 +1,6 @@
 package com.nudge.app.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.nudge.app.data.ConnectionStatus
 import com.nudge.app.data.PhysicianConnection
+import com.nudge.app.ui.theme.MedicalGradient
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,66 +45,74 @@ fun PhysicianDashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Physician Dashboard", fontWeight = FontWeight.Bold) },
+                title = { Text("Physician Dashboard", fontWeight = FontWeight.Bold, color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.Close, contentDescription = "Back")
+                        Icon(Icons.Default.Close, contentDescription = "Back", tint = Color.White)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
-        }
+        },
+        containerColor = Color.Transparent
     ) { padding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(brush = MedicalGradient)
                 .padding(padding)
-                .padding(16.dp)
         ) {
-            // Pending Requests Section
-            if (pendingRequests.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                // Pending Requests Section
+                if (pendingRequests.isNotEmpty()) {
+                    item {
+                        Text(
+                            "PENDING REQUESTS",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+                    items(pendingRequests) { request ->
+                        ConnectionRequestItem(
+                            request = request,
+                            onAccept = { viewModel.acceptConnection(request) },
+                            onReject = { viewModel.rejectConnection(request) }
+                        )
+                    }
+                    item { Spacer(modifier = Modifier.height(24.dp)) }
+                }
+
+                // My Patients Section
                 item {
                     Text(
-                        "PENDING REQUESTS",
+                        "MY PATIENTS",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
-                items(pendingRequests) { request ->
-                    ConnectionRequestItem(
-                        request = request,
-                        onAccept = { viewModel.acceptConnection(request) },
-                        onReject = { viewModel.rejectConnection(request) }
-                    )
-                }
-                item { Spacer(modifier = Modifier.height(24.dp)) }
-            }
 
-            // My Patients Section
-            item {
-                Text(
-                    "MY PATIENTS",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-            }
-
-            if (myPatients.isEmpty()) {
-                item {
-                    Text(
-                        "No connected patients yet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray,
-                        modifier = Modifier.padding(vertical = 16.dp)
-                    )
-                }
-            } else {
-                items(myPatients) { patient ->
-                    PatientItem(
-                        patient = patient,
-                        onClick = { onNavigateToPatientDetail(patient.patientUsername) }
-                    )
+                if (myPatients.isEmpty()) {
+                    item {
+                        Text(
+                            "No connected patients yet.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                    }
+                } else {
+                    items(myPatients) { patient ->
+                        PatientItem(
+                            patient = patient,
+                            onClick = { onNavigateToPatientDetail(patient.patientUsername) }
+                        )
+                    }
                 }
             }
         }
@@ -117,22 +127,23 @@ fun ConnectionRequestItem(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(40.dp))
+            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(40.dp), tint = Color.White)
             Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
-                Text(request.patientUsername, fontWeight = FontWeight.Bold)
-                Text("Requested connection", fontSize = 12.sp, color = Color.Gray)
+                Text(request.patientUsername, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Requested connection", fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f))
             }
             IconButton(onClick = onAccept) {
-                Icon(Icons.Default.Check, contentDescription = "Accept", tint = Color.Green)
+                Icon(Icons.Default.Check, contentDescription = "Accept", tint = Color(0xFF00E676))
             }
             IconButton(onClick = onReject) {
-                Icon(Icons.Default.Close, contentDescription = "Reject", tint = Color.Red)
+                Icon(Icons.Default.Close, contentDescription = "Reject", tint = Color(0xFFFF5252))
             }
         }
     }
@@ -148,21 +159,23 @@ fun PatientItem(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(40.dp))
+            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(40.dp), tint = Color.White)
             Text(
                 patient.patientUsername,
                 modifier = Modifier.padding(start = 16.dp),
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp
+                fontSize = 18.sp,
+                color = Color.White
             )
             Spacer(modifier = Modifier.weight(1f))
-            Text("View Details", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
+            Text("View Details", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

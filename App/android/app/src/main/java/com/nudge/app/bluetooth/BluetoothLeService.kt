@@ -110,9 +110,10 @@ class BluetoothLeService : Service() {
             return
         }
         
-        val service = gatt.getService(SERVICE_RX_UUID)
+        // Both TX and RX characteristics now live in the same Service
+        val service = gatt.getService(SERVICE_UUID)
         if (service == null) {
-            Log.e("BLE", "RX Service not found: $SERVICE_RX_UUID")
+            Log.e("BLE", "Nudge Service not found: $SERVICE_UUID")
             return
         }
         
@@ -174,10 +175,10 @@ class BluetoothLeService : Service() {
                     }
                 }
 
-                val service = gatt.getService(SERVICE_TX_UUID)
+                // Look for the single Nudge service containing both characteristics
+                val service = gatt.getService(SERVICE_UUID)
                 if (service == null) {
-                    Log.e("BLE", "TX Service not found! Looking for: $SERVICE_TX_UUID")
-                    gatt.services.forEach { Log.d("BLE", "Available Service: ${it.uuid}") }
+                    Log.e("BLE", "Nudge Service not found! Looking for: $SERVICE_UUID")
                     return
                 }
 
@@ -247,8 +248,8 @@ class BluetoothLeService : Service() {
             lastCallbackTime = currentTime
             lastCallbackValueHash = valueHash
 
-            val hexString = value.joinToString("-") { "%02X".format(it) }
-            Log.d("BLE", "Raw Data (${value.size} bytes): $hexString")
+            // val hexString = value.joinToString("-") { "%02X".format(it) }
+            // Log.d("BLE", "Raw Data (${value.size} bytes): $hexString")
 
             val packet = deserializer.processSegment(value)
             if (packet != null) {
@@ -258,8 +259,7 @@ class BluetoothLeService : Service() {
     }
 
     companion object {
-        val SERVICE_TX_UUID: UUID = UUID.fromString("000B1E53-D47A-CEDE-DE57-000000008488")
-        val SERVICE_RX_UUID: UUID = UUID.fromString("000B1E53-D47A-CEDE-DE57-000000008288")
+        val SERVICE_UUID: UUID = UUID.fromString("000B1E53-D47A-CEDE-DE57-000000008488")
         val CHAR_TX_UUID: UUID = UUID.fromString("00008488-D47A-CEDE-0000-466178454d47")
         val CHAR_RX_UUID: UUID = UUID.fromString("00008288-D47A-CEDE-0000-526563436d64")
     }

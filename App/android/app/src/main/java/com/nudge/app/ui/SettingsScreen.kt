@@ -1,5 +1,6 @@
 package com.nudge.app.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -16,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.nudge.app.data.UserRole
+import com.nudge.app.ui.theme.MedicalGradient
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,84 +42,96 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                title = { Text("Account Settings", fontWeight = FontWeight.Bold, color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
-        }
+        },
+        containerColor = Color.Transparent
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(brush = MedicalGradient)
                 .padding(padding)
-                .padding(24.dp)
         ) {
-            // Profile Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Profile Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(60.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Column(modifier = Modifier.padding(start = 16.dp)) {
-                        Text(username, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        Text(role.name, color = Color.Gray, fontSize = 14.sp)
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(60.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Column(modifier = Modifier.padding(start = 16.dp)) {
+                            Text(username, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(role.name, color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp)
+                        }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Logout Button
+                Button(
+                    onClick = onLogout,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White.copy(alpha = 0.1f),
+                        contentColor = Color.White
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                ) {
+                    Icon(Icons.Default.Logout, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Logout", fontWeight = FontWeight.SemiBold)
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Danger Zone
+                Text(
+                    "DANGER ZONE",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color(0xFFFF5252), // Neon Red
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                OutlinedButton(
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF5252).copy(alpha = 0.5f))
+                ) {
+                    Icon(Icons.Default.DeleteForever, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Delete Account Permanently", fontWeight = FontWeight.Bold)
+                }
+                
+                Text(
+                    "Deleting your account will permanently remove all your session data, statistics, and connections. This action cannot be undone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.4f),
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Logout Button
-            Button(
-                onClick = onLogout,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-            ) {
-                Icon(Icons.Default.Logout, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Logout", color = MaterialTheme.colorScheme.onSurface)
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Danger Zone
-            Text(
-                "DANGER ZONE",
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.Red,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            
-            OutlinedButton(
-                onClick = { showDeleteConfirm = true },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f))
-            ) {
-                Icon(Icons.Default.DeleteForever, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Delete Account Permanently")
-            }
-            
-            Text(
-                "Deleting your account will permanently remove all your session data, statistics, and connections. This action cannot be undone.",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray,
-                modifier = Modifier.padding(top = 8.dp)
-            )
         }
     }
 

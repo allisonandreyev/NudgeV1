@@ -54,7 +54,7 @@ class PacketDeserializer {
             val totalPayloadLength = ((segment[4].toInt() and 0xFF) shl 8) or (segment[5].toInt() and 0xFF)
 
             val payloadPart = segment.copyOfRange(6, segment.size)
-            Log.d("Packet", "Segment: msgId=$messageId, index=$currentSegment, totalSegs=$totalSegments, partSize=${payloadPart.size}, totalExp=$totalPayloadLength")
+            // Log.d("Packet", "Segment: msgId=$messageId, index=$currentSegment, totalSegs=$totalSegments, partSize=${payloadPart.size}, totalExp=$totalPayloadLength")
 
             if (totalSegments <= 1) {
                 return decodePayload(version, flags, messageId, payloadPart)
@@ -103,8 +103,8 @@ class PacketDeserializer {
         val buffer = ByteBuffer.wrap(payload).order(ByteOrder.BIG_ENDIAN)
         val decodedData = mutableListOf<Any>()
 
-        val hexPayload = payload.joinToString("-") { "%02X".format(it) }
-        Log.d("Packet", "Decoding payload of size ${payload.size}: $hexPayload")
+        // val hexPayload = payload.joinToString("-") { "%02X".format(it) }
+        // Log.d("Packet", "Decoding payload of size ${payload.size}: $hexPayload")
 
         while (buffer.remaining() >= 4) {
             val typeVal = buffer.short.toInt() and 0xFFFF
@@ -138,7 +138,7 @@ class PacketDeserializer {
                     TypeCode.Raw -> valueBytes
                 }
                 decodedData.add(decodedValue)
-                Log.d("Packet", "Decoded $type: $decodedValue")
+                // Log.d("Packet", "Decoded $type: $decodedValue")
             } catch (e: Exception) {
                 Log.e("Packet", "Failed to decode type $type", e)
                 decodedData.add(valueBytes) // Fallback to raw bytes

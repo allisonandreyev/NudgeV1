@@ -1,5 +1,6 @@
 package com.nudge.app.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.nudge.app.ui.theme.MedicalGradient
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -42,119 +44,131 @@ fun PatientDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Patient Detail: $patientUsername", fontWeight = FontWeight.Bold) },
+                title = { Text("Patient Detail: $patientUsername", fontWeight = FontWeight.Bold, color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
-        }
+        },
+        containerColor = Color.Transparent
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(brush = MedicalGradient)
                 .padding(padding)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Patient Header
-            Icon(
-                Icons.Default.Person,
-                contentDescription = null,
-                modifier = Modifier.size(80.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Text(patientUsername, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Text("Patient Status: Active", color = Color.Gray)
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Stats Grid
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                StatCard(
-                    label = "Flappy Bird High Score",
-                    value = stats?.highScore?.toString() ?: "0",
-                    icon = Icons.Default.Star,
-                    modifier = Modifier.weight(1f)
-                )
-                StatCard(
-                    label = "Total Sessions",
-                    value = sessions.size.toString(),
-                    icon = Icons.Default.BarChart,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // History Section
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text(
-                    "REAL SESSION HISTORY",
-                    modifier = Modifier.padding(start = 8.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
+                // Patient Header
+                Icon(
+                    Icons.Default.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(80.dp),
+                    tint = Color.White.copy(alpha = 0.5f)
                 )
-            }
+                Text(patientUsername, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Patient Status: Active", color = Color.White.copy(alpha = 0.6f))
 
-            if (sessions.isEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
-                ) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No sessions recorded yet.", color = Color.Gray)
-                    }
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Stats Grid
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    StatCard(
+                        label = "Flappy Bird High Score",
+                        value = stats?.highScore?.toString() ?: "0",
+                        icon = Icons.Default.Star,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatCard(
+                        label = "Total Sessions",
+                        value = sessions.size.toString(),
+                        icon = Icons.Default.BarChart,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // History Section
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(sessions) { session ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onNavigateToSessionDetail(session.sessionId) },
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                    Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Text(
+                        "REAL SESSION HISTORY",
+                        modifier = Modifier.padding(start = 8.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                if (sessions.isEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No sessions recorded yet.", color = Color.White.copy(alpha = 0.5f))
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(sessions) { session ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onNavigateToSessionDetail(session.sessionId) },
+                                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
                             ) {
-                                Column {
-                                    Text(
-                                        text = "Session #${session.sessionId}",
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = dateFormatter.format(Date(session.startTime)),
-                                        fontSize = 12.sp,
-                                        color = Color.Gray
-                                    )
-                                }
-                                if (session.isUploaded) {
-                                    Text("UPLOADED", color = Color(0xFF4CAF50), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "Session #${session.sessionId}",
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = dateFormatter.format(Date(session.startTime)),
+                                            fontSize = 12.sp,
+                                            color = Color.White.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                    if (session.isUploaded) {
+                                        Text("UPLOADED", color = Color(0xFF00E676), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Button(
-                onClick = { /* Placeholder for export or notes */ },
-                modifier = Modifier.fillMaxWidth().height(56.dp)
-            ) {
-                Text("Export Clinical Report")
+                Button(
+                    onClick = { /* Placeholder */ },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Export Clinical Report", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                }
             }
         }
     }
@@ -164,8 +178,8 @@ fun PatientDetailScreen(
 fun StatCard(label: String, value: String, icon: ImageVector, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier.height(140.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
     ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -173,8 +187,8 @@ fun StatCard(label: String, value: String, icon: ImageVector, modifier: Modifier
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Text(value, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
-            Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text(value, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+            Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.5f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
     }
 }

@@ -109,7 +109,7 @@ class BluetoothViewModel @Inject constructor(
         }
         lastMessageId = packet.messageId
 
-        Log.d("BluetoothViewModel", "Handling packet: msgId=${packet.messageId}, dataSize=${packet.data.size}, values=${packet.data}")
+        // Log.d("BluetoothViewModel", "Handling packet: msgId=${packet.messageId}, dataSize=${packet.data.size}, values=${packet.data}")
         val currentTime = System.currentTimeMillis()
         if (lastReceiveTime != 0L) {
             val delta = currentTime - lastReceiveTime
