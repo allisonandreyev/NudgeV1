@@ -6,7 +6,7 @@ void setup()
 {
   Serial.begin(115200);
   ServoController::Init();
-  ServoController::SetServo(8, 180, 35);
+  // ServoController::SetServo(8, 180, 35);
 
   ble.Init("Nudge Prototype 0.0.1");
 
