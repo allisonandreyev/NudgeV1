@@ -25,7 +25,7 @@ fun AutomatedTrainingScreen(
     username: String,
     onBack: () -> Unit,
     trainingViewModel: TrainingViewModel = hiltViewModel(),
-    bluetoothViewModel: BluetoothViewModel = hiltViewModel()
+    bluetoothViewModel: BluetoothViewModel
 ) {
     val uiState by trainingViewModel.uiState.collectAsState()
     val currentGesture by trainingViewModel.currentGesture.collectAsState()
@@ -47,6 +47,7 @@ fun AutomatedTrainingScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .safeDrawingPadding()
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -78,7 +79,13 @@ fun AutomatedTrainingScreen(
                         emgDataD0 = emgD0,
                         emgDataD1 = emgD1,
                         emgDataD2 = emgD2,
-                        onStop = { trainingViewModel.stopTraining { bluetoothViewModel.setActiveLabel(it) } }
+                        onStop = { trainingViewModel.stopTraining { bluetoothViewModel.setActiveLabel(it) } },
+                        onSaveEarly = {
+                            scope.launch {
+                                val data = trainingViewModel.getLabeledData(username)
+                                CSVExporter.exportTrainingData(context, username, data)
+                            }
+                        }
                     )
                 }
                 TrainingState.FINISHED -> {
@@ -160,7 +167,8 @@ fun ColumnScope.TrainingRecordingView(
     emgDataD0: List<Float>,
     emgDataD1: List<Float>,
     emgDataD2: List<Float>,
-    onStop: () -> Unit
+    onStop: () -> Unit,
+    onSaveEarly: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -174,7 +182,7 @@ fun ColumnScope.TrainingRecordingView(
         )
         
         CircularProgressIndicator(
-            progress = seconds / 5f,
+            progress = { seconds / 5f },
             modifier = Modifier.size(40.dp),
             strokeWidth = 4.dp,
             color = MaterialTheme.colorScheme.primary
@@ -215,6 +223,19 @@ fun ColumnScope.TrainingRecordingView(
         colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.2f))
     ) {
         Text("Stop Calibration")
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    OutlinedButton(
+        onClick = onSaveEarly,
+        modifier = Modifier.fillMaxWidth().height(48.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White.copy(alpha = 0.7f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+    ) {
+        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text("Save Current Progress Early")
     }
 }
 

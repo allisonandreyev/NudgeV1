@@ -42,6 +42,10 @@ fun PatientDetailScreen(
     val dateFormatter = SimpleDateFormat("MMM dd, yyyy - HH:mm", Locale.getDefault())
 
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(brush = MedicalGradient)
+            .safeDrawingPadding(),
         topBar = {
             TopAppBar(
                 title = { Text("Patient Detail: $patientUsername", fontWeight = FontWeight.Bold, color = Color.White) },

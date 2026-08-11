@@ -40,6 +40,10 @@ fun SettingsScreen(
     }
 
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(brush = MedicalGradient)
+            .safeDrawingPadding(),
         topBar = {
             TopAppBar(
                 title = { Text("Account Settings", fontWeight = FontWeight.Bold, color = Color.White) },

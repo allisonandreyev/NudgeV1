@@ -25,6 +25,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nudge.app.bluetooth.BluetoothViewModel
+import com.nudge.app.ui.theme.MedicalGradient
 import com.nudge.app.ui.theme.NudgeTheme
 
 @SuppressLint("MissingPermission")
@@ -57,23 +58,28 @@ fun DeviceSelectScreen(
     )
 
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(brush = MedicalGradient)
+            .safeDrawingPadding(),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Device Selection", fontWeight = FontWeight.Bold) },
+                title = { Text("Device Selection", fontWeight = FontWeight.Bold, color = Color.White) },
                 actions = {
                     IconButton(onClick = { 
                         viewModel.startScanning()
                         isScanning = true
                     }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                    containerColor = Color.Transparent,
+                    titleContentColor = Color.White
                 )
             )
-        }
+        },
+        containerColor = Color.Transparent
     ) { padding ->
         Column(
             modifier = Modifier
@@ -89,7 +95,7 @@ fun DeviceSelectScreen(
                 modifier = Modifier
                     .size(120.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                    .background(Color.White.copy(alpha = 0.1f))
             ) {
                 Icon(
                     imageVector = Icons.Default.Bluetooth,
@@ -97,7 +103,7 @@ fun DeviceSelectScreen(
                     modifier = Modifier
                         .size(48.dp)
                         .graphicsLayer(scaleX = scale, scaleY = scale),
-                    tint = if (connectionState == BluetoothProfile.STATE_CONNECTED) Color.Green else MaterialTheme.colorScheme.primary
+                    tint = if (connectionState == BluetoothProfile.STATE_CONNECTED) Color(0xFF00E676) else MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -110,7 +116,7 @@ fun DeviceSelectScreen(
                     else -> if (isScanning) "Scanning for Nudge Wearables..." else "Select your device"
                 },
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = Color.White
             )
 
             if (isScanning && connectionState != BluetoothProfile.STATE_CONNECTED) {
@@ -120,7 +126,7 @@ fun DeviceSelectScreen(
                         .fillMaxWidth()
                         .clip(CircleShape),
                     color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                    trackColor = Color.White.copy(alpha = 0.1f)
                 )
             }
 
@@ -142,15 +148,15 @@ fun DeviceSelectScreen(
                     .weight(1f)
                     .padding(horizontal = 16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = Color.White.copy(alpha = 0.05f),
                 ),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
             ) {
                 LazyColumn {
                     items(devices) { device ->
                         ListItem(
-                            headlineContent = { Text(device.name ?: "Unknown Device", fontWeight = FontWeight.SemiBold) },
-                            supportingContent = { Text(device.address) },
+                            headlineContent = { Text(device.name ?: "Unknown Device", fontWeight = FontWeight.SemiBold, color = Color.White) },
+                            supportingContent = { Text(device.address, color = Color.White.copy(alpha = 0.6f)) },
                             leadingContent = {
                                 Icon(
                                     Icons.Default.Bluetooth,
@@ -171,7 +177,7 @@ fun DeviceSelectScreen(
                         HorizontalDivider(
                             modifier = Modifier.padding(horizontal = 16.dp),
                             thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
+                            color = Color.White.copy(alpha = 0.1f)
                         )
                     }
                 }
@@ -180,7 +186,7 @@ fun DeviceSelectScreen(
             Text(
                 text = "Ensure your Nudge device is powered on.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                color = Color.White.copy(alpha = 0.6f),
                 modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
             )
 
@@ -188,7 +194,7 @@ fun DeviceSelectScreen(
                 onClick = onSkipConnection,
                 modifier = Modifier.padding(bottom = 16.dp)
             ) {
-                Text("Skip for now", color = MaterialTheme.colorScheme.primary)
+                Text("Skip for now", color = Color.White.copy(alpha = 0.7f))
             }
         }
     }

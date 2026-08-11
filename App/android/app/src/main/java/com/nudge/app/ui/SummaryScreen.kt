@@ -55,6 +55,10 @@ fun SummaryScreen(
     }
 
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(brush = MedicalGradient)
+            .safeDrawingPadding(),
         topBar = {
             TopAppBar(
                 title = { 

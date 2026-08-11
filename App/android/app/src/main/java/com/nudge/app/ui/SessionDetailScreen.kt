@@ -44,6 +44,10 @@ fun SessionDetailScreen(
     val durationSec = durationMs / 1000
 
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(brush = MedicalGradient)
+            .safeDrawingPadding(),
         topBar = {
             TopAppBar(
                 title = { Text("Session Detail #$sessionId", fontWeight = FontWeight.Bold, color = Color.White) },

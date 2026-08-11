@@ -162,6 +162,7 @@ fun NudgeApp() {
         composable("therapy") {
             TherapySessionScreen(
                 username = currentUsername ?: "guest",
+                bluetoothViewModel = bluetoothViewModel,
                 onSessionEnd = { navController.popBackStack() }
             )
         }
@@ -201,6 +202,7 @@ fun NudgeApp() {
         composable("training") {
             AutomatedTrainingScreen(
                 username = currentUsername ?: "guest",
+                bluetoothViewModel = bluetoothViewModel,
                 onBack = { navController.popBackStack() }
             )
         }

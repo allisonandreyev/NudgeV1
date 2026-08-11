@@ -43,6 +43,10 @@ fun PhysicianDashboardScreen(
     val myPatients = connections.filter { it.status == ConnectionStatus.ACCEPTED }
 
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(brush = MedicalGradient)
+            .safeDrawingPadding(),
         topBar = {
             TopAppBar(
                 title = { Text("Physician Dashboard", fontWeight = FontWeight.Bold, color = Color.White) },

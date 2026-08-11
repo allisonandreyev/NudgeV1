@@ -26,7 +26,7 @@ fun TherapySessionScreen(
     username: String,
     onSessionEnd: () -> Unit,
     therapyViewModel: TherapyViewModel = hiltViewModel(),
-    bluetoothViewModel: BluetoothViewModel = hiltViewModel()
+    bluetoothViewModel: BluetoothViewModel
 ) {
     val uiState by therapyViewModel.uiState.collectAsState()
     val timerSeconds by therapyViewModel.timerSeconds.collectAsState()
@@ -52,6 +52,7 @@ fun TherapySessionScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .safeDrawingPadding()
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
