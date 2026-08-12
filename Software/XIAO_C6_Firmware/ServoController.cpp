@@ -14,10 +14,16 @@ void ServoController::WriteServo(uint8_t id, float angle)
 {
     if (id >= SERVO_COUNT) return;
 
-    angle = constrain(angle, 0, SERVO_MAX_ANGLE);
-    float pulse = SERVO_MIN_US + ((SERVO_MAX_US - SERVO_MIN_US) * angle / SERVO_MAX_ANGLE);
+    /**
+     * DUAL-LAYER PROTECTION for DSS-M15S 270:
+     * 1. constrain ensures the input angle never exceeds our 255 safe limit.
+     * 2. map scales that angle based on the servo's physical 270 range.
+     */
+    angle = constrain(angle, 0.0f, SERVO_MAX_ANGLE);
 
-    // Physically update the PWM hardware
+    // Pulse calculation: 0 to 270 maps to 500us to 2500us
+    float pulse = SERVO_MIN_US + ((SERVO_MAX_US - SERVO_MIN_US) * angle / PHYSICAL_MAX_ANGLE);
+
     pwm.setPWM(id, 0, microsecondsToTicks(pulse));
 }
 
@@ -27,14 +33,13 @@ void ServoController::ServoTask(void *parameter)
 
     while (true)
     {
-        // 1. Process all pending commands
         while (xQueueReceive(servoQueue, &cmd, 0) == pdTRUE)
         {
             if (cmd.type == CommandType::STOP_ALL) {
                 for(int i = 0; i < SERVO_COUNT; i++) {
                     servo[i].moving = false;
                     servo[i].target = servo[i].current;
-                    pwm.setPWM(i, 0, 4096); // Hardware-level power kill
+                    pwm.setPWM(i, 0, 4096);
                 }
                 Serial.println(">> EMERGENCY STOP: All servos halted.");
                 continue;
@@ -43,17 +48,17 @@ void ServoController::ServoTask(void *parameter)
             if (cmd.id >= SERVO_COUNT) continue;
 
             if (cmd.type == CommandType::MOVE) {
-                servo[cmd.id].target = constrain(cmd.angle, 0, SERVO_MAX_ANGLE);
-                servo[cmd.id].speed = constrain(cmd.speed, 1, 300);
+                // Hard software limit of 255 applied to target
+                servo[cmd.id].target = constrain(cmd.angle, 0.0f, SERVO_MAX_ANGLE);
+                servo[cmd.id].speed = constrain(cmd.speed, 1.0f, 300.0f);
                 servo[cmd.id].moving = true;
                 servo[cmd.id].activeTime = 0;
 
-                Serial.printf("Servo %d -> %.1f deg @ %.1f dps\n",
+                Serial.printf("Servo %d -> %.1f deg (Safe Limit: 255) @ %.1f dps\n",
                              cmd.id, servo[cmd.id].target, servo[cmd.id].speed);
             }
         }
 
-        // 2. Movement Step & Efficient Write Logic
         for (int i = 0; i < SERVO_COUNT; i++)
         {
             if (!servo[i].moving) {
@@ -75,23 +80,17 @@ void ServoController::ServoTask(void *parameter)
             float difference = servo[i].target - servo[i].current;
             float movement = servo[i].speed * (SERVO_UPDATE_MS / 1000.0);
 
-            // Calculate new position
             float nextPosition;
             if (abs(difference) <= max(movement, SERVO_THRESHOLD))
             {
                 nextPosition = servo[i].target;
                 servo[i].moving = false;
-                Serial.printf("Servo %d reached target in %dMS.\r\n", i, servo[i].activeTime);
             }
             else if (difference > 0)
                 nextPosition = servo[i].current + movement;
             else
                 nextPosition = servo[i].current - movement;
 
-            /**
-             * OPTIMIZATION: Only write to the I2C bus if the position has
-             * changed meaningfully since the last 10ms frame.
-             */
             if (abs(nextPosition - servo[i].current) > 0.01f) {
                 WriteServo(i, nextPosition);
                 servo[i].current = nextPosition;
@@ -137,7 +136,7 @@ void ServoController::ParseCommand(String cmd)
 
     int id; float a; float speed;
     if (sscanf(cmd.c_str(), "Servo %d %f %f", &id, &a, &speed) == 3) {
-        SetServo(id, id >= GRASP_START_ID && id <= GRASP_END_ID ? a : a, speed); // Keep individual control simple
+        SetServo(id, a, speed);
         return;
     }
 
@@ -196,31 +195,25 @@ void ServoController::MovePTO(float angle, float speed)
 
 void ServoController::EngagePTO(float speed)
 {
-    MovePTO(60.0f, speed);
+    MovePTO(PTO_ENGAGED_ANGLE, speed);
 }
 
 void ServoController::DisengagePTO(float speed)
 {
-    MovePTO(0.0f, speed);
+    MovePTO(PTO_DISENGAGED_ANGLE, speed);
 }
 
 void ServoController::MoveGrasp(float angle, float speed)
 {
-    // 1. Pull Grasp Spools (1-4) to target
     for (int i = GRASP_START_ID; i <= GRASP_END_ID; i++) {
         SetServo(i, angle, speed);
     }
-    // 2. RELEASE Retraction Spool (5) to prevent mechanical bind
-    // We move it to the "loose" position (0) at the same speed
     SetServo(RETRACT_SERVO_ID, 0.0f, speed);
 }
 
 void ServoController::MoveRetract(float angle, float speed)
 {
-    // 1. Pull Retraction Spool (5) to target
     SetServo(RETRACT_SERVO_ID, angle, speed);
-
-    // 2. RELEASE Grasp Spools (1-4) to prevent mechanical bind
     for (int i = GRASP_START_ID; i <= GRASP_END_ID; i++) {
         SetServo(i, 0.0f, speed);
     }

@@ -11,11 +11,14 @@
 
 #define PWM_FREQ 50
 
-// Servo calibration
+// Servo calibration for DSS-M15S (270 degree model)
 #define SERVO_MIN_US 500
 #define SERVO_MAX_US 2500
+#define PHYSICAL_MAX_ANGLE 270.0f // The servo's actual mechanical capability
 
-#define SERVO_MAX_ANGLE 270
+// Software Limit (Restricting range to prevent spool binding)
+#define SERVO_MAX_ANGLE 255.0f
+
 #define SERVO_COUNT 6
 
 // Pin Definitions
@@ -25,7 +28,7 @@
 #define RETRACT_SERVO_ID 5
 
 // PTO Calibration
-#define PTO_ENGAGED_ANGLE 60.0f
+#define PTO_ENGAGED_ANGLE 40.0f
 #define PTO_DISENGAGED_ANGLE 0.0f
 
 // Servo update rate

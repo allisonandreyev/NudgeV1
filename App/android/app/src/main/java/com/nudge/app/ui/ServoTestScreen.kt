@@ -114,14 +114,14 @@ fun ServoTestScreen(
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
-                            onClick = { viewModel.sendCommand("grasp 180 ${globalSpeed.toInt()}") },
+                            onClick = { viewModel.sendCommand("grasp 255 ${globalSpeed.toInt()}") },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676))
                         ) {
                             Text("Full Grasp", fontSize = 12.sp, color = Color.Black)
                         }
                         Button(
-                            onClick = { viewModel.sendCommand("retract 180 ${globalSpeed.toInt()}") },
+                            onClick = { viewModel.sendCommand("retract 255 ${globalSpeed.toInt()}") },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9100))
                         ) {
@@ -194,7 +194,7 @@ fun IndividualServoControl(label: String, angle: Float, onAngleChange: (Float) -
             Slider(
                 value = angle,
                 onValueChange = onAngleChange,
-                valueRange = 0f..270f,
+                valueRange = 0f..255f,
                 colors = SliderDefaults.colors(
                     thumbColor = Color.White,
                     activeTrackColor = MaterialTheme.colorScheme.primary
