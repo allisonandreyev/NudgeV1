@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 enum class TrainingState {
-    IDLE, COUNTDOWN, RECORDING, FINISHED
+    IDLE, COUNTDOWN, PREPARING_GESTURE, RECORDING, FINISHED
 }
 
 @HiltViewModel
@@ -24,7 +24,8 @@ class TrainingViewModel @Inject constructor(
 
     private val gestures = listOf("REST", "OPEN", "PINCH", "CLOSE")
     private val totalRepetitions = 10
-    private val recordingDurationMs = 5000L
+    private val transitionDurationMs = 1250L // Stabilization window
+    private val recordingDurationMs = 4000L   // Pure gesture window
 
     private val _uiState = MutableStateFlow(TrainingState.IDLE)
     val uiState = _uiState.asStateFlow()
@@ -35,7 +36,7 @@ class TrainingViewModel @Inject constructor(
     private val _currentRepetition = MutableStateFlow(0)
     val currentRepetition = _currentRepetition.asStateFlow()
 
-    private val _timerSeconds = MutableStateFlow(0)
+    private val _timerSeconds = MutableStateFlow(0f)
     val timerSeconds = _timerSeconds.asStateFlow()
 
     private var trainingJob: Job? = null
@@ -43,12 +44,11 @@ class TrainingViewModel @Inject constructor(
     fun startTraining(username: String, onLabelChanged: (String?) -> Unit) {
         trainingJob?.cancel()
         trainingJob = viewModelScope.launch {
-            // First clear any data from this session attempt if we are restarting
             dataPointDao.clearTrainingData(username)
             
             _uiState.value = TrainingState.COUNTDOWN
             for (i in 3 downTo 1) {
-                _timerSeconds.value = i
+                _timerSeconds.value = i.toFloat()
                 delay(1000)
             }
 
@@ -56,12 +56,21 @@ class TrainingViewModel @Inject constructor(
                 _currentRepetition.value = rep
                 for (gesture in gestures) {
                     _currentGesture.value = gesture
-                    onLabelChanged(gesture)
-                    _uiState.value = TrainingState.RECORDING
                     
-                    for (i in (recordingDurationMs / 1000).toInt() downTo 1) {
-                        _timerSeconds.value = i
-                        delay(1000)
+                    // Phase 1: Transition/Preparation (1.25s) - UNLABELED
+                    _uiState.value = TrainingState.PREPARING_GESTURE
+                    onLabelChanged(null) 
+                    _timerSeconds.value = transitionDurationMs / 1000f
+                    delay(transitionDurationMs)
+
+                    // Phase 2: Active Recording (4s) - LABELED
+                    _uiState.value = TrainingState.RECORDING
+                    onLabelChanged(gesture)
+                    
+                    val steps = 40 // 4 seconds / 100ms steps for smooth UI
+                    for (i in steps downTo 1) {
+                        _timerSeconds.value = i * 0.1f
+                        delay(100)
                     }
                 }
             }

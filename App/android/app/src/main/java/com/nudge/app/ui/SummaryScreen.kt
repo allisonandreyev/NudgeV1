@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Dangerous
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Send
@@ -34,6 +35,7 @@ fun SummaryScreen(
     onStartTherapy: () -> Unit = {},
     onStartMinigame: () -> Unit = {},
     onStartTraining: () -> Unit = {},
+    onStartServoTest: () -> Unit = {},
     onViewPhysicianDashboard: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {}
 ) {
@@ -93,6 +95,14 @@ fun SummaryScreen(
                     }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                    }
+                    if (userRole == UserRole.PATIENT && connectionState == BluetoothProfile.STATE_CONNECTED) {
+                        IconButton(
+                            onClick = { viewModel.sendCommand("stop") },
+                            modifier = Modifier.padding(start = 4.dp)
+                        ) {
+                            Icon(Icons.Default.Dangerous, contentDescription = "Stop All", tint = Color.Red)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -254,16 +264,30 @@ fun SummaryScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (userRole == UserRole.PATIENT) {
-                        // Test User Special Button
+                        // Test User Special Buttons
                         if (username == "test_user") {
-                            Button(
-                                onClick = onStartTraining,
+                            Row(
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Default.Psychology, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Start Automated Training", fontWeight = FontWeight.Bold)
+                                Button(
+                                    onClick = onStartTraining,
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Icon(Icons.Default.Psychology, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Train AI", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Button(
+                                    onClick = onStartServoTest,
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f))
+                                ) {
+                                    Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Calibrate", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
 

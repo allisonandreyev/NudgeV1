@@ -196,24 +196,26 @@ fun MinigameScreen(
             if (gameState == GameState.GAME_OVER) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f))
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
                     ) {
                         Column(
                             modifier = Modifier.padding(32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text("GAME OVER", fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                            Text("GAME OVER", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text("Your Score: $score")
-                            Text("Best: $highScore")
+                            Text("Your Score: $score", color = Color.White.copy(alpha = 0.8f))
+                            Text("Best: $highScore", color = Color.White.copy(alpha = 0.8f))
                             Spacer(modifier = Modifier.height(24.dp))
-                            Button(onClick = { 
-                                resetGame()
-                            }) {
-                                Text("Try Again")
+                            Button(
+                                onClick = { resetGame() },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text("Try Again", color = MaterialTheme.colorScheme.onPrimary)
                             }
                             TextButton(onClick = onGameEnd) {
-                                Text("Back to Dashboard")
+                                Text("Back to Dashboard", color = Color.White.copy(alpha = 0.7f))
                             }
                         }
                     }

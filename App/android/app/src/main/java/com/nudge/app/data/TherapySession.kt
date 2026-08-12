@@ -10,6 +10,7 @@ data class TherapySession(
     val startTime: Long = System.currentTimeMillis(),
     val endTime: Long? = null,
     val restPosition: RestPosition,
+    val notes: String? = null, // Added for clinical observations
     val isUploaded: Boolean = false,
     val isSynced: Boolean = false
 )

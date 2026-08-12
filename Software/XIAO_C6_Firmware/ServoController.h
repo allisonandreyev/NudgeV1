@@ -16,36 +16,66 @@
 #define SERVO_MAX_US 2500
 
 #define SERVO_MAX_ANGLE 270
-#define SERVO_COUNT 16
+#define SERVO_COUNT 6
+
+// Pin Definitions
+#define PTO_SERVO_ID 0
+#define GRASP_START_ID 1
+#define GRASP_END_ID 4
+#define RETRACT_SERVO_ID 5
+
+// PTO Calibration
+#define PTO_ENGAGED_ANGLE 60.0f
+#define PTO_DISENGAGED_ANGLE 0.0f
 
 // Servo update rate
 #define SERVO_UPDATE_MS 10
+#define ALLOWED_ACTIVE_TIME 4000
+#define SERVO_THRESHOLD 2.0f
+
+enum class CommandType {
+    MOVE,
+    STOP_ALL,
+    SET_PULSE
+};
 
 struct ServoCommand
 {
-  uint8_t id;
-  float angle;
-  float speed;
+    CommandType type;
+    uint8_t id;
+    float angle;
+    float speed;
 };
 
 struct ServoState
 {
-  float current;
-  float target;
-  float speed;
-  bool moving;
+    float current;
+    float target;
+    float speed;
+    bool moving;
+    uint16_t activeTime;
 };
 
 class ServoController
 {
-  public:
+public:
     ServoController();
     ~ServoController();
     static void Init();
     static void ParseCommand(String cmd);
     static void SetServo(uint8_t id, float angle, float speed);
+    static void StopAll();
 
-  private:
+    // High-level Abstractions
+    static void MovePTO(float angle, float speed);
+    static void MoveGrasp(float angle, float speed);
+    static void MoveRetract(float angle, float speed);
+
+    // PTO Specific Actions
+    static void EngagePTO(float speed = 100.0f);
+    static void DisengagePTO(float speed = 100.0f);
+
+private:
     static ServoState servo[SERVO_COUNT];
     static void ServoTask(void *parameter);
 

@@ -32,6 +32,7 @@ import com.nudge.app.ui.LoginScreen
 import com.nudge.app.ui.MinigameScreen
 import com.nudge.app.ui.PatientDetailScreen
 import com.nudge.app.ui.PhysicianDashboardScreen
+import com.nudge.app.ui.ServoTestScreen
 import com.nudge.app.ui.SessionDetailScreen
 import com.nudge.app.ui.SettingsScreen
 import com.nudge.app.ui.SignUpScreen
@@ -154,6 +155,9 @@ fun NudgeApp() {
                 onStartTraining = {
                     navController.navigate("training")
                 },
+                onStartServoTest = {
+                    navController.navigate("servo_test")
+                },
                 onNavigateToSettings = {
                     navController.navigate("settings")
                 }
@@ -203,6 +207,12 @@ fun NudgeApp() {
             AutomatedTrainingScreen(
                 username = currentUsername ?: "guest",
                 bluetoothViewModel = bluetoothViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable("servo_test") {
+            ServoTestScreen(
+                viewModel = bluetoothViewModel,
                 onBack = { navController.popBackStack() }
             )
         }

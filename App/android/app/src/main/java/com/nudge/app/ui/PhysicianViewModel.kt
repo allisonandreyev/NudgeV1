@@ -96,4 +96,13 @@ class PhysicianViewModel @Inject constructor(
     suspend fun getSessionById(sessionId: Long): TherapySession? {
         return therapySessionDao.getSessionById(sessionId)
     }
+
+    fun updateSessionNotes(sessionId: Long, notes: String) {
+        viewModelScope.launch {
+            val session = therapySessionDao.getSessionById(sessionId)
+            if (session != null) {
+                therapySessionDao.update(session.copy(notes = notes))
+            }
+        }
+    }
 }

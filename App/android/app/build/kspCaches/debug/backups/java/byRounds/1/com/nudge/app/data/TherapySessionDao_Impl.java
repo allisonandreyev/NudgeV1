@@ -50,7 +50,7 @@ public final class TherapySessionDao_Impl implements TherapySessionDao {
       @Override
       @NonNull
       protected String createQuery() {
-        return "INSERT OR REPLACE INTO `therapy_sessions` (`sessionId`,`username`,`startTime`,`endTime`,`restPosition`,`isUploaded`,`isSynced`) VALUES (nullif(?, 0),?,?,?,?,?,?)";
+        return "INSERT OR REPLACE INTO `therapy_sessions` (`sessionId`,`username`,`startTime`,`endTime`,`restPosition`,`notes`,`isUploaded`,`isSynced`) VALUES (nullif(?, 0),?,?,?,?,?,?,?)";
       }
 
       @Override
@@ -66,17 +66,22 @@ public final class TherapySessionDao_Impl implements TherapySessionDao {
         }
         final String _tmp = __converters.fromRestPosition(entity.getRestPosition());
         statement.bindString(5, _tmp);
+        if (entity.getNotes() == null) {
+          statement.bindNull(6);
+        } else {
+          statement.bindString(6, entity.getNotes());
+        }
         final int _tmp_1 = entity.isUploaded() ? 1 : 0;
-        statement.bindLong(6, _tmp_1);
+        statement.bindLong(7, _tmp_1);
         final int _tmp_2 = entity.isSynced() ? 1 : 0;
-        statement.bindLong(7, _tmp_2);
+        statement.bindLong(8, _tmp_2);
       }
     };
     this.__updateAdapterOfTherapySession = new EntityDeletionOrUpdateAdapter<TherapySession>(__db) {
       @Override
       @NonNull
       protected String createQuery() {
-        return "UPDATE OR ABORT `therapy_sessions` SET `sessionId` = ?,`username` = ?,`startTime` = ?,`endTime` = ?,`restPosition` = ?,`isUploaded` = ?,`isSynced` = ? WHERE `sessionId` = ?";
+        return "UPDATE OR ABORT `therapy_sessions` SET `sessionId` = ?,`username` = ?,`startTime` = ?,`endTime` = ?,`restPosition` = ?,`notes` = ?,`isUploaded` = ?,`isSynced` = ? WHERE `sessionId` = ?";
       }
 
       @Override
@@ -92,11 +97,16 @@ public final class TherapySessionDao_Impl implements TherapySessionDao {
         }
         final String _tmp = __converters.fromRestPosition(entity.getRestPosition());
         statement.bindString(5, _tmp);
+        if (entity.getNotes() == null) {
+          statement.bindNull(6);
+        } else {
+          statement.bindString(6, entity.getNotes());
+        }
         final int _tmp_1 = entity.isUploaded() ? 1 : 0;
-        statement.bindLong(6, _tmp_1);
+        statement.bindLong(7, _tmp_1);
         final int _tmp_2 = entity.isSynced() ? 1 : 0;
-        statement.bindLong(7, _tmp_2);
-        statement.bindLong(8, entity.getSessionId());
+        statement.bindLong(8, _tmp_2);
+        statement.bindLong(9, entity.getSessionId());
       }
     };
     this.__preparedStmtOfDeleteSession = new SharedSQLiteStatement(__db) {
@@ -223,6 +233,7 @@ public final class TherapySessionDao_Impl implements TherapySessionDao {
           final int _cursorIndexOfStartTime = CursorUtil.getColumnIndexOrThrow(_cursor, "startTime");
           final int _cursorIndexOfEndTime = CursorUtil.getColumnIndexOrThrow(_cursor, "endTime");
           final int _cursorIndexOfRestPosition = CursorUtil.getColumnIndexOrThrow(_cursor, "restPosition");
+          final int _cursorIndexOfNotes = CursorUtil.getColumnIndexOrThrow(_cursor, "notes");
           final int _cursorIndexOfIsUploaded = CursorUtil.getColumnIndexOrThrow(_cursor, "isUploaded");
           final int _cursorIndexOfIsSynced = CursorUtil.getColumnIndexOrThrow(_cursor, "isSynced");
           final TherapySession _result;
@@ -243,6 +254,12 @@ public final class TherapySessionDao_Impl implements TherapySessionDao {
             final String _tmp;
             _tmp = _cursor.getString(_cursorIndexOfRestPosition);
             _tmpRestPosition = __converters.toRestPosition(_tmp);
+            final String _tmpNotes;
+            if (_cursor.isNull(_cursorIndexOfNotes)) {
+              _tmpNotes = null;
+            } else {
+              _tmpNotes = _cursor.getString(_cursorIndexOfNotes);
+            }
             final boolean _tmpIsUploaded;
             final int _tmp_1;
             _tmp_1 = _cursor.getInt(_cursorIndexOfIsUploaded);
@@ -251,7 +268,7 @@ public final class TherapySessionDao_Impl implements TherapySessionDao {
             final int _tmp_2;
             _tmp_2 = _cursor.getInt(_cursorIndexOfIsSynced);
             _tmpIsSynced = _tmp_2 != 0;
-            _result = new TherapySession(_tmpSessionId,_tmpUsername,_tmpStartTime,_tmpEndTime,_tmpRestPosition,_tmpIsUploaded,_tmpIsSynced);
+            _result = new TherapySession(_tmpSessionId,_tmpUsername,_tmpStartTime,_tmpEndTime,_tmpRestPosition,_tmpNotes,_tmpIsUploaded,_tmpIsSynced);
           } else {
             _result = null;
           }
@@ -281,6 +298,7 @@ public final class TherapySessionDao_Impl implements TherapySessionDao {
           final int _cursorIndexOfStartTime = CursorUtil.getColumnIndexOrThrow(_cursor, "startTime");
           final int _cursorIndexOfEndTime = CursorUtil.getColumnIndexOrThrow(_cursor, "endTime");
           final int _cursorIndexOfRestPosition = CursorUtil.getColumnIndexOrThrow(_cursor, "restPosition");
+          final int _cursorIndexOfNotes = CursorUtil.getColumnIndexOrThrow(_cursor, "notes");
           final int _cursorIndexOfIsUploaded = CursorUtil.getColumnIndexOrThrow(_cursor, "isUploaded");
           final int _cursorIndexOfIsSynced = CursorUtil.getColumnIndexOrThrow(_cursor, "isSynced");
           final List<TherapySession> _result = new ArrayList<TherapySession>(_cursor.getCount());
@@ -302,6 +320,12 @@ public final class TherapySessionDao_Impl implements TherapySessionDao {
             final String _tmp;
             _tmp = _cursor.getString(_cursorIndexOfRestPosition);
             _tmpRestPosition = __converters.toRestPosition(_tmp);
+            final String _tmpNotes;
+            if (_cursor.isNull(_cursorIndexOfNotes)) {
+              _tmpNotes = null;
+            } else {
+              _tmpNotes = _cursor.getString(_cursorIndexOfNotes);
+            }
             final boolean _tmpIsUploaded;
             final int _tmp_1;
             _tmp_1 = _cursor.getInt(_cursorIndexOfIsUploaded);
@@ -310,7 +334,7 @@ public final class TherapySessionDao_Impl implements TherapySessionDao {
             final int _tmp_2;
             _tmp_2 = _cursor.getInt(_cursorIndexOfIsSynced);
             _tmpIsSynced = _tmp_2 != 0;
-            _item = new TherapySession(_tmpSessionId,_tmpUsername,_tmpStartTime,_tmpEndTime,_tmpRestPosition,_tmpIsUploaded,_tmpIsSynced);
+            _item = new TherapySession(_tmpSessionId,_tmpUsername,_tmpStartTime,_tmpEndTime,_tmpRestPosition,_tmpNotes,_tmpIsUploaded,_tmpIsSynced);
             _result.add(_item);
           }
           return _result;

@@ -25,7 +25,7 @@ fun AutomatedTrainingScreen(
     username: String,
     onBack: () -> Unit,
     trainingViewModel: TrainingViewModel = hiltViewModel(),
-    bluetoothViewModel: BluetoothViewModel
+    bluetoothViewModel: BluetoothViewModel = hiltViewModel()
 ) {
     val uiState by trainingViewModel.uiState.collectAsState()
     val currentGesture by trainingViewModel.currentGesture.collectAsState()
@@ -69,7 +69,13 @@ fun AutomatedTrainingScreen(
                     )
                 }
                 TrainingState.COUNTDOWN -> {
-                    TrainingCountdownView(timerSeconds)
+                    TrainingCountdownView(timerSeconds.toInt())
+                }
+                TrainingState.PREPARING_GESTURE -> {
+                    TrainingPreparationView(
+                        gesture = currentGesture,
+                        rep = currentRepetition
+                    )
                 }
                 TrainingState.RECORDING -> {
                     TrainingRecordingView(
@@ -124,7 +130,7 @@ fun ColumnScope.TrainingIdleView(onStart: () -> Unit, onClear: () -> Unit) {
     )
     
     Text(
-        "The app will guide you through 10 cycles of Rest, Open, Pinch, and Close gestures. This will build your personal EMG dataset.",
+        "The app will guide you through 10 cycles of Rest, Open, Pinch, and Close gestures. 1.25s is given to switch, then 4s is recorded.",
         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         color = Color.White.copy(alpha = 0.7f),
         modifier = Modifier.padding(top = 16.dp)
@@ -160,10 +166,39 @@ fun ColumnScope.TrainingCountdownView(seconds: Int) {
 }
 
 @Composable
+fun ColumnScope.TrainingPreparationView(gesture: String, rep: Int) {
+    Column(
+        modifier = Modifier.weight(1f),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            "SWITCH TO",
+            fontSize = 24.sp,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            gesture,
+            fontSize = 64.sp,
+            fontWeight = FontWeight.Black,
+            color = Color.White
+        )
+        Spacer(modifier = Modifier.height(32.dp))
+        LinearProgressIndicator(
+            modifier = Modifier.fillMaxWidth().height(8.dp).padding(horizontal = 48.dp),
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Stabilizing signals...", color = Color.White.copy(alpha = 0.5f))
+    }
+}
+
+@Composable
 fun ColumnScope.TrainingRecordingView(
     gesture: String, 
     rep: Int, 
-    seconds: Int, 
+    seconds: Float, 
     emgDataD0: List<Float>,
     emgDataD1: List<Float>,
     emgDataD2: List<Float>,
@@ -182,7 +217,7 @@ fun ColumnScope.TrainingRecordingView(
         )
         
         CircularProgressIndicator(
-            progress = { seconds / 5f },
+            progress = { seconds / 4f },
             modifier = Modifier.size(40.dp),
             strokeWidth = 4.dp,
             color = MaterialTheme.colorScheme.primary

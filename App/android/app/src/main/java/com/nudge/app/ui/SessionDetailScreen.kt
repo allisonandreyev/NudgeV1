@@ -2,8 +2,11 @@ package com.nudge.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.TrendingUp
@@ -31,9 +34,12 @@ fun SessionDetailScreen(
 ) {
     var session by remember { mutableStateOf<TherapySession?>(null) }
     val points by viewModel.getPointsForSession(sessionId).collectAsState(initial = emptyList())
+    var notesText by remember { mutableStateOf("") }
     
     LaunchedEffect(sessionId) {
-        session = viewModel.getSessionById(sessionId)
+        val s = viewModel.getSessionById(sessionId)
+        session = s
+        notesText = s?.notes ?: ""
     }
 
     val dateFormatter = SimpleDateFormat("MMM dd, yyyy - HH:mm", Locale.getDefault())
@@ -61,103 +67,128 @@ fun SessionDetailScreen(
         },
         containerColor = Color.Transparent
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(brush = MedicalGradient)
                 .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            // Header Info
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
             ) {
-                // Header Info
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = session?.let { dateFormatter.format(Date(it.startTime)) } ?: "Loading...",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Resting Position: ${session?.restPosition?.name ?: "N/A"}",
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 14.sp
-                        )
-                    }
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = session?.let { dateFormatter.format(Date(it.startTime)) } ?: "Loading...",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Resting Position: ${session?.restPosition?.name ?: "N/A"}",
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 14.sp
+                    )
                 }
+            }
 
-                Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-                // Large Graph
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(250.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.3f)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("FULL SESSION TIMELINE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        if (points.isNotEmpty()) {
-                            LineGraph(
-                                data = points.map { it.value },
-                                modifier = Modifier.fillMaxSize(),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        } else {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("No data points captured.", color = Color.White.copy(alpha = 0.4f))
-                            }
+            // Large Graph
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(250.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.3f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("FULL SESSION TIMELINE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (points.isNotEmpty()) {
+                        LineGraph(
+                            data = points.map { it.value },
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No data points captured.", color = Color.White.copy(alpha = 0.4f))
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Metrics Grid
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    MetricItem(
-                        label = "MAX SIGNAL",
-                        value = maxVal.toString(),
-                        icon = Icons.Default.TrendingUp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricItem(
-                        label = "AVG SIGNAL",
-                        value = avgVal.toString(),
-                        icon = Icons.Default.Speed,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricItem(
-                        label = "DURATION",
-                        value = "${durationSec}s",
-                        icon = Icons.Default.Timer,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                Button(
-                    onClick = { /* Placeholder */ },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text("Add Clinical Notes", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
-                }
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Metrics Grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MetricItem(
+                    label = "MAX SIGNAL",
+                    value = maxVal.toString(),
+                    icon = Icons.Default.TrendingUp,
+                    modifier = Modifier.weight(1f)
+                )
+                MetricItem(
+                    label = "AVG SIGNAL",
+                    value = avgVal.toString(),
+                    icon = Icons.Default.Speed,
+                    modifier = Modifier.weight(1f)
+                )
+                MetricItem(
+                    label = "DURATION",
+                    value = "${durationSec}s",
+                    icon = Icons.Default.Timer,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Clinical Notes Section
+            Text(
+                "CLINICAL OBSERVATIONS",
+                modifier = Modifier.align(Alignment.Start),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = notesText,
+                onValueChange = { notesText = it },
+                modifier = Modifier.fillMaxWidth().height(150.dp),
+                placeholder = { Text("Enter observations, progress notes, or recommendations...", color = Color.White.copy(alpha = 0.4f)) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedTextColor = Color.White,
+                    focusedTextColor = Color.White
+                ),
+                shape = MaterialTheme.shapes.medium
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = { viewModel.updateSessionNotes(sessionId, notesText) },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Default.Save, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Save Clinical Notes", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }

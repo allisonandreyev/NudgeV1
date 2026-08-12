@@ -53,7 +53,7 @@ class MyCallbacks: public BLECharacteristicCallbacks {
 void setup() {
   Serial.begin(115200);
   analogReadResolution(12); // XIAO C6 is 12-bit (0-4095)
-
+  Wire.begin();
   // Initialize Servo Controller
   ServoController::Init();
 
@@ -65,16 +65,16 @@ void setup() {
 
   // TX Characteristic (Notify) - Data stream to App
   pTxCharacteristic = pService->createCharacteristic(
-                        CHAR_TX_UUID,
-                        BLECharacteristic::PROPERTY_NOTIFY
-                      );
+          CHAR_TX_UUID,
+          BLECharacteristic::PROPERTY_NOTIFY
+  );
   pTxCharacteristic->addDescriptor(new BLE2902());
 
   // RX Characteristic (Write) - Command stream from App
   BLECharacteristic *pRxCharacteristic = pService->createCharacteristic(
-                                         CHAR_RX_UUID,
-                                         BLECharacteristic::PROPERTY_WRITE
-                                       );
+          CHAR_RX_UUID,
+          BLECharacteristic::PROPERTY_WRITE
+  );
   pRxCharacteristic->setCallbacks(new MyCallbacks());
 
   pService->start();
