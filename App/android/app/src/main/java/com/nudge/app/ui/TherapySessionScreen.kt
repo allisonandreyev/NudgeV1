@@ -44,6 +44,16 @@ fun TherapySessionScreen(
         bluetoothViewModel.setActiveSession(currentSessionId)
     }
 
+    // Enable AI Actuation during active session
+    if (uiState == TherapyState.ACTIVE_REST || uiState == TherapyState.ACTIVE_CONTRACT) {
+        DisposableEffect(Unit) {
+            bluetoothViewModel.sendCommand("ai_start")
+            onDispose {
+                bluetoothViewModel.sendCommand("ai_stop")
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
