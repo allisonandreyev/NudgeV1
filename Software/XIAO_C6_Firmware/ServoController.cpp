@@ -9,19 +9,17 @@ Adafruit_PWMServoDriver ServoController::pwm = Adafruit_PWMServoDriver(PCA9685_A
 TaskHandle_t ServoController::servoTaskHandle = NULL;
 QueueHandle_t ServoController::servoQueue = NULL;
 bool ServoController::randomMode = false;
+bool ServoController::aiActuationEnabled = false;
+
+// IDs for the Grasp fingers (excluding PTO 0 and Retract 3)
+static const uint8_t GRASP_IDS[] = {1, 2, 4, 5};
+static const int GRASP_COUNT = 4;
 
 void ServoController::WriteServo(uint8_t id, float angle)
 {
     if (id >= SERVO_COUNT) return;
 
-    /**
-     * DUAL-LAYER PROTECTION for DSS-M15S 270:
-     * 1. constrain ensures the input angle never exceeds our 255 safe limit.
-     * 2. map scales that angle based on the servo's physical 270 range.
-     */
     angle = constrain(angle, 0.0f, SERVO_MAX_ANGLE);
-
-    // Pulse calculation: 0 to 270 maps to 500us to 2500us
     float pulse = SERVO_MIN_US + ((SERVO_MAX_US - SERVO_MIN_US) * angle / PHYSICAL_MAX_ANGLE);
 
     pwm.setPWM(id, 0, microsecondsToTicks(pulse));
@@ -48,14 +46,13 @@ void ServoController::ServoTask(void *parameter)
             if (cmd.id >= SERVO_COUNT) continue;
 
             if (cmd.type == CommandType::MOVE) {
-                // Hard software limit of 255 applied to target
                 servo[cmd.id].target = constrain(cmd.angle, 0.0f, SERVO_MAX_ANGLE);
                 servo[cmd.id].speed = constrain(cmd.speed, 1.0f, 300.0f);
                 servo[cmd.id].moving = true;
                 servo[cmd.id].activeTime = 0;
 
                 Serial.printf("Servo %d -> %.1f deg (Safe Limit: 255) @ %.1f dps\n",
-                             cmd.id, servo[cmd.id].target, servo[cmd.id].speed);
+                              cmd.id, servo[cmd.id].target, servo[cmd.id].speed);
             }
         }
 
@@ -101,6 +98,15 @@ void ServoController::ServoTask(void *parameter)
     }
 }
 
+void ServoController::EnableAIActuation(bool enable) {
+    aiActuationEnabled = enable;
+    Serial.printf("AI Actuation: %s\n", enable ? "ENABLED" : "DISABLED");
+}
+
+bool ServoController::IsAIActuationEnabled() {
+    return aiActuationEnabled;
+}
+
 void ServoController::Help()
 {
     Serial.println("\nCommands:");
@@ -119,8 +125,8 @@ void ServoController::Status()
     for (int i = 0; i < SERVO_COUNT; i++)
     {
         Serial.printf("%d: %.1f -> %.1f %s\n", i,
-                     servo[i].current, servo[i].target,
-                     servo[i].moving ? "MOVING" : "IDLE");
+                      servo[i].current, servo[i].target,
+                      servo[i].moving ? "MOVING" : "IDLE");
     }
 }
 
@@ -133,6 +139,8 @@ void ServoController::ParseCommand(String cmd)
     if (cmd.equalsIgnoreCase("stop")) { StopAll(); return; }
     if (cmd.equalsIgnoreCase("engage")) { EngagePTO(); return; }
     if (cmd.equalsIgnoreCase("disengage")) { DisengagePTO(); return; }
+    if (cmd.equalsIgnoreCase("ai_start")) { EnableAIActuation(true); return; }
+    if (cmd.equalsIgnoreCase("ai_stop")) { EnableAIActuation(false); return; }
 
     int id; float a; float speed;
     if (sscanf(cmd.c_str(), "Servo %d %f %f", &id, &a, &speed) == 3) {
@@ -205,8 +213,8 @@ void ServoController::DisengagePTO(float speed)
 
 void ServoController::MoveGrasp(float angle, float speed)
 {
-    for (int i = GRASP_START_ID; i <= GRASP_END_ID; i++) {
-        SetServo(i, angle, speed);
+    for (int i = 0; i < GRASP_COUNT; i++) {
+        SetServo(GRASP_IDS[i], angle, speed);
     }
     SetServo(RETRACT_SERVO_ID, 0.0f, speed);
 }
@@ -214,7 +222,7 @@ void ServoController::MoveGrasp(float angle, float speed)
 void ServoController::MoveRetract(float angle, float speed)
 {
     SetServo(RETRACT_SERVO_ID, angle, speed);
-    for (int i = GRASP_START_ID; i <= GRASP_END_ID; i++) {
-        SetServo(i, 0.0f, speed);
+    for (int i = 0; i < GRASP_COUNT; i++) {
+        SetServo(GRASP_IDS[i], 0.0f, speed);
     }
 }

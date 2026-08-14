@@ -410,23 +410,26 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
 
     @IdentifierNameString
     private static final class LazyClassKeyProvider {
-      static String com_nudge_app_ui_PhysicianViewModel = "com.nudge.app.ui.PhysicianViewModel";
+      static String com_nudge_app_ui_MinigameViewModel = "com.nudge.app.ui.MinigameViewModel";
 
-      static String com_nudge_app_bluetooth_BluetoothViewModel = "com.nudge.app.bluetooth.BluetoothViewModel";
+      static String com_nudge_app_ui_TrainingViewModel = "com.nudge.app.ui.TrainingViewModel";
+
+      static String com_nudge_app_ui_PhysicianViewModel = "com.nudge.app.ui.PhysicianViewModel";
 
       static String com_nudge_app_ui_TherapyViewModel = "com.nudge.app.ui.TherapyViewModel";
 
       static String com_nudge_app_ui_AuthViewModel = "com.nudge.app.ui.AuthViewModel";
 
-      static String com_nudge_app_ui_MinigameViewModel = "com.nudge.app.ui.MinigameViewModel";
+      static String com_nudge_app_bluetooth_BluetoothViewModel = "com.nudge.app.bluetooth.BluetoothViewModel";
 
-      static String com_nudge_app_ui_TrainingViewModel = "com.nudge.app.ui.TrainingViewModel";
+      @KeepFieldType
+      MinigameViewModel com_nudge_app_ui_MinigameViewModel2;
+
+      @KeepFieldType
+      TrainingViewModel com_nudge_app_ui_TrainingViewModel2;
 
       @KeepFieldType
       PhysicianViewModel com_nudge_app_ui_PhysicianViewModel2;
-
-      @KeepFieldType
-      BluetoothViewModel com_nudge_app_bluetooth_BluetoothViewModel2;
 
       @KeepFieldType
       TherapyViewModel com_nudge_app_ui_TherapyViewModel2;
@@ -435,10 +438,7 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
       AuthViewModel com_nudge_app_ui_AuthViewModel2;
 
       @KeepFieldType
-      MinigameViewModel com_nudge_app_ui_MinigameViewModel2;
-
-      @KeepFieldType
-      TrainingViewModel com_nudge_app_ui_TrainingViewModel2;
+      BluetoothViewModel com_nudge_app_bluetooth_BluetoothViewModel2;
     }
   }
 
@@ -494,26 +494,17 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
 
     @IdentifierNameString
     private static final class LazyClassKeyProvider {
-      static String com_nudge_app_ui_AuthViewModel = "com.nudge.app.ui.AuthViewModel";
-
-      static String com_nudge_app_ui_TherapyViewModel = "com.nudge.app.ui.TherapyViewModel";
-
-      static String com_nudge_app_ui_PhysicianViewModel = "com.nudge.app.ui.PhysicianViewModel";
-
       static String com_nudge_app_bluetooth_BluetoothViewModel = "com.nudge.app.bluetooth.BluetoothViewModel";
 
       static String com_nudge_app_ui_MinigameViewModel = "com.nudge.app.ui.MinigameViewModel";
 
+      static String com_nudge_app_ui_TherapyViewModel = "com.nudge.app.ui.TherapyViewModel";
+
       static String com_nudge_app_ui_TrainingViewModel = "com.nudge.app.ui.TrainingViewModel";
 
-      @KeepFieldType
-      AuthViewModel com_nudge_app_ui_AuthViewModel2;
+      static String com_nudge_app_ui_PhysicianViewModel = "com.nudge.app.ui.PhysicianViewModel";
 
-      @KeepFieldType
-      TherapyViewModel com_nudge_app_ui_TherapyViewModel2;
-
-      @KeepFieldType
-      PhysicianViewModel com_nudge_app_ui_PhysicianViewModel2;
+      static String com_nudge_app_ui_AuthViewModel = "com.nudge.app.ui.AuthViewModel";
 
       @KeepFieldType
       BluetoothViewModel com_nudge_app_bluetooth_BluetoothViewModel2;
@@ -522,7 +513,16 @@ public final class DaggerNudgeApplication_HiltComponents_SingletonC {
       MinigameViewModel com_nudge_app_ui_MinigameViewModel2;
 
       @KeepFieldType
+      TherapyViewModel com_nudge_app_ui_TherapyViewModel2;
+
+      @KeepFieldType
       TrainingViewModel com_nudge_app_ui_TrainingViewModel2;
+
+      @KeepFieldType
+      PhysicianViewModel com_nudge_app_ui_PhysicianViewModel2;
+
+      @KeepFieldType
+      AuthViewModel com_nudge_app_ui_AuthViewModel2;
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {

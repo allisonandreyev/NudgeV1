@@ -14,21 +14,20 @@
 // Servo calibration for DSS-M15S (270 degree model)
 #define SERVO_MIN_US 500
 #define SERVO_MAX_US 2500
-#define PHYSICAL_MAX_ANGLE 270.0f // The servo's actual mechanical capability
+#define PHYSICAL_MAX_ANGLE 270.0f
 
-// Software Limit (Restricting range to prevent spool binding)
+// Software Limit
 #define SERVO_MAX_ANGLE 255.0f
 
 #define SERVO_COUNT 6
 
 // Pin Definitions
 #define PTO_SERVO_ID 0
-#define GRASP_START_ID 1
-#define GRASP_END_ID 4
-#define RETRACT_SERVO_ID 5
+#define RETRACT_SERVO_ID 3
+// Grasp servos are 1, 2, 4, 5 (Handled by list in implementation)
 
 // PTO Calibration
-#define PTO_ENGAGED_ANGLE 40.0f
+#define PTO_ENGAGED_ANGLE 30.0f
 #define PTO_DISENGAGED_ANGLE 0.0f
 
 // Servo update rate
@@ -69,6 +68,10 @@ public:
     static void SetServo(uint8_t id, float angle, float speed);
     static void StopAll();
 
+    // AI Actuation Control
+    static void EnableAIActuation(bool enable);
+    static bool IsAIActuationEnabled();
+
     // High-level Abstractions
     static void MovePTO(float angle, float speed);
     static void MoveGrasp(float angle, float speed);
@@ -82,17 +85,15 @@ private:
     static ServoState servo[SERVO_COUNT];
     static void ServoTask(void *parameter);
 
-    // cmdline functions
     static void Status();
     static void Help();
     static void WriteServo(uint8_t id, float angle);
 
-    // helper function
     static uint16_t microsecondsToTicks(float us) { return (uint32_t)(us * 4096.0 / 20000.0); }
 
-    // variables
     static Adafruit_PWMServoDriver pwm;
     static TaskHandle_t servoTaskHandle;
     static QueueHandle_t servoQueue;
     static bool randomMode;
+    static bool aiActuationEnabled;
 };

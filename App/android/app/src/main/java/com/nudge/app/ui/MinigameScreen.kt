@@ -34,7 +34,8 @@ data class Pipe(
 fun MinigameScreen(
     username: String,
     onGameEnd: () -> Unit,
-    viewModel: MinigameViewModel = hiltViewModel()
+    viewModel: MinigameViewModel = hiltViewModel(),
+    bluetoothViewModel: com.nudge.app.bluetooth.BluetoothViewModel = hiltViewModel()
 ) {
     var gameState by remember { mutableStateOf(GameState.START) }
     var birdY by remember { mutableStateOf(500f) }
@@ -43,8 +44,18 @@ fun MinigameScreen(
     var score by remember { mutableStateOf(0) }
     val highScore by viewModel.highScore.collectAsState()
 
+    val emgD0 by bluetoothViewModel.emgDataD0.collectAsState()
+    val lastGesture by bluetoothViewModel.lastGesture.collectAsState()
+
     var screenWidth by remember { mutableStateOf(1080f) }
     var screenHeight by remember { mutableStateOf(1920f) }
+
+    // EMG Control Logic
+    LaunchedEffect(lastGesture) {
+        if (gameState == GameState.PLAYING && lastGesture == "OPEN") {
+            birdVelocity = -9.5f // Trigger jump from flex
+        }
+    }
 
     // Physics Constants - Tuned to be slower and use more screen
     val gravity = 0.34f      // 75% of previous 0.45f

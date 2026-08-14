@@ -49,6 +49,9 @@ class BluetoothViewModel @Inject constructor(
     private val _emgDataD2 = MutableStateFlow<List<Float>>(emptyList())
     val emgDataD2 = _emgDataD2.asStateFlow()
 
+    private val _lastGesture = MutableStateFlow("UNKNOWN")
+    val lastGesture = _lastGesture.asStateFlow()
+
     private val _receiveFrequency = MutableStateFlow(0f)
     val receiveFrequency = _receiveFrequency.asStateFlow()
 
@@ -132,7 +135,27 @@ class BluetoothViewModel @Inject constructor(
 
         // The packet.data list contains the decoded TLV values.
         // We expect up to 3 values: D0, D1, D2 in order.
+        // Optional 4th value: AI Classification result
         packet.data.forEachIndexed { index, value ->
+            if (index == 3) {
+                // Potential AI result
+                val gesture = when (value) {
+                    is String -> value
+                    is Number -> {
+                        when (value.toInt()) {
+                            0 -> "CLOSE"
+                            1 -> "OPEN"
+                            2 -> "PINCH"
+                            3 -> "REST"
+                            else -> "UNKNOWN"
+                        }
+                    }
+                    else -> "???"
+                }
+                _lastGesture.value = gesture
+                return@forEachIndexed
+            }
+
             val floatValue = when (value) {
                 is Number -> value.toFloat()
                 is UByte -> value.toFloat()

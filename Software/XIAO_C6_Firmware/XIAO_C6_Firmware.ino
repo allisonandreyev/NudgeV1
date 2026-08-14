@@ -1,7 +1,8 @@
 /**
  * Nudge Wearable Firmware - XIAO ESP32-C6
+ * AI Inference Integrated (D1, D2 Sensors)
  * Triple EMG Sensor Stream (D0, D1, D2)
- * Remote Servo Control (0-15)
+ * Remote Servo Control (0-5)
  * Using Custom Binary TLV Protocol
  */
 
@@ -11,123 +12,175 @@
 #include <BLE2902.h>
 #include "ServoController.h"
 
+// Edge Impulse library header for nudgeml_v2
+#include <NudgeML_V2_inferencing.h>
+
 // UUIDs - MUST MATCH ANDROID APP
 #define SERVICE_UUID        "000B1E53-D47A-CEDE-DE57-000000008488"
-#define CHAR_TX_UUID        "00008488-D47A-CEDE-0000-466178454D47" // For Sending Data
-#define CHAR_RX_UUID        "00008288-D47A-CEDE-0000-526563436D64" // For Receiving Commands
+#define CHAR_TX_UUID        "00008488-D47A-CEDE-0000-466178454D47"
+#define CHAR_RX_UUID        "00008288-D47A-CEDE-0000-526563436D64"
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pTxCharacteristic = NULL;
 bool deviceConnected = false;
 uint8_t messageId = 0;
 
-// TLV Type Codes from App's Packet.kt
 const uint16_t TYPE_FLOAT = 0x1130;
+const uint16_t TYPE_INT16 = 0x1112;
+
+// --- AI BUFFERING & SMOOTHING ---
+float features[EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE];
+int featureIndex = 0;
+
+int classificationCounter = 0;
+const int CLASSIFICATION_STABILITY_REQUIRED = 3;
+int lastRawClassification = -1;
+int confirmedClassification = -1;
 
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
-      deviceConnected = true;
-      Serial.println(">> App Connected");
+        deviceConnected = true;
+        Serial.println(">> App Connected");
     };
     void onDisconnect(BLEServer* pServer) {
-      deviceConnected = false;
-      Serial.println(">> App Disconnected");
-      BLEDevice::startAdvertising();
+        deviceConnected = false;
+        Serial.println(">> App Disconnected");
+        BLEDevice::startAdvertising();
     }
 };
 
-// Catch commands from the App
 class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
-      String value = pCharacteristic->getValue();
-      if (value.length() > 0) {
-        Serial.print("Command Received: ");
-        Serial.println(value);
-
-        // Process servo commands (e.g., "Servo 0 180 50")
-        ServoController::ParseCommand(value);
-      }
+        String value = pCharacteristic->getValue();
+        if (value.length() > 0) {
+            Serial.print("Command Received: ");
+            Serial.println(value);
+            ServoController::ParseCommand(value);
+        }
     }
 };
 
 void setup() {
-  Serial.begin(115200);
-  analogReadResolution(12); // XIAO C6 is 12-bit (0-4095)
-  Wire.begin();
-  // Initialize Servo Controller
-  ServoController::Init();
+    Serial.begin(115200);
+    analogReadResolution(12);
+    Wire.begin();
+    ServoController::Init();
 
-  BLEDevice::init("Nudge-C6");
-  pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
+    /**
+     * SAFETY BOOT SEQUENCE
+     * 1. Disengage PTO (0) -> Wait 2s
+     * 2. Home all servos (0) -> Wait 2s
+     * 3. Engage PTO (30)
+     */
+    Serial.println(">> Starting Safety Boot Sequence...");
+    ServoController::DisengagePTO(100);
+    delay(2000);
 
-  BLEService *pService = pServer->createService(SERVICE_UUID);
+    for(int i=1; i<6; i++) {
+        ServoController::SetServo(i, 0, 100);
+    }
+    delay(2000);
 
-  // TX Characteristic (Notify) - Data stream to App
-  pTxCharacteristic = pService->createCharacteristic(
-          CHAR_TX_UUID,
-          BLECharacteristic::PROPERTY_NOTIFY
-  );
-  pTxCharacteristic->addDescriptor(new BLE2902());
+    ServoController::EngagePTO(100);
+    Serial.println(">> Boot Sequence Complete.");
 
-  // RX Characteristic (Write) - Command stream from App
-  BLECharacteristic *pRxCharacteristic = pService->createCharacteristic(
-          CHAR_RX_UUID,
-          BLECharacteristic::PROPERTY_WRITE
-  );
-  pRxCharacteristic->setCallbacks(new MyCallbacks());
+    BLEDevice::init("Nudge-C6");
+    pServer = BLEDevice::createServer();
+    pServer->setCallbacks(new MyServerCallbacks());
 
-  pService->start();
-  BLEDevice::getAdvertising()->addServiceUUID(SERVICE_UUID);
-  pServer->getAdvertising()->start();
-  Serial.println(">> Nudge Ready (Sensors + Servos)");
+    BLEService *pService = pServer->createService(SERVICE_UUID);
+
+    pTxCharacteristic = pService->createCharacteristic(
+            CHAR_TX_UUID,
+            BLECharacteristic::PROPERTY_NOTIFY
+    );
+    pTxCharacteristic->addDescriptor(new BLE2902());
+
+    BLECharacteristic *pRxCharacteristic = pService->createCharacteristic(
+            CHAR_RX_UUID,
+            BLECharacteristic::PROPERTY_WRITE
+    );
+    pRxCharacteristic->setCallbacks(new MyCallbacks());
+
+    pService->start();
+    BLEDevice::getAdvertising()->addServiceUUID(SERVICE_UUID);
+    pServer->getAdvertising()->start();
+    Serial.println(">> Nudge Ready (Sensors + Servos + TinyML)");
 }
 
 void loop() {
-  if (deviceConnected) {
-    // 1. Read Sensors
-    float emg0 = analogRead(D0);
-    float emg1 = analogRead(D1);
-    float emg2 = analogRead(D2);
+    if (deviceConnected) {
+        // 1. Read Sensors
+        float emg0 = analogRead(D0);
+        float emg1 = analogRead(D1);
+        float emg2 = analogRead(D2);
 
-    /**
-     * 2. Build Custom TLV Packet
-     * Header (6 bytes) + 3 TLV Chunks (8 bytes each) = 30 bytes total
-     */
-    uint8_t packet[30];
+        features[featureIndex++] = emg1;
+        features[featureIndex++] = emg2;
 
-    // HEADER
-    packet[0] = 0x01;       // Version
-    packet[1] = 0x00;       // Flags
-    packet[2] = messageId++; // Msg ID
-    packet[3] = 0x10;       // Segments (High nibble: 1 total, Low nibble: 0 current)
-    packet[4] = 0x00;       // Payload Length High Byte
-    packet[5] = 24;         // Payload Length Low Byte (3 sensors * 8 bytes)
+        if (featureIndex >= EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE) {
+            signal_t signal;
+            numpy::signal_from_buffer(features, EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE, &signal);
 
-    int offset = 6;
+            ei_impulse_result_t result = { 0 };
+            EI_IMPULSE_ERROR res = run_classifier(&signal, &result, false);
 
-    // SENSOR D0 CHUNK (TLV)
-    packet[offset++] = (TYPE_FLOAT >> 8) & 0xFF;
-    packet[offset++] = TYPE_FLOAT & 0xFF;             // Type: Float (0x1130)
-    packet[offset++] = 0x00; packet[offset++] = 0x04; // Length: 4 bytes
-    memcpy(&packet[offset], &emg0, 4); offset += 4;   // Value
+            if (res == EI_IMPULSE_OK) {
+                float max_val = 0;
+                int rawResult = -1;
+                for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
+                    if (result.classification[ix].value > max_val) {
+                        max_val = result.classification[ix].value;
+                        rawResult = (int)ix;
+                    }
+                }
 
-    // SENSOR D1 CHUNK (TLV)
-    packet[offset++] = (TYPE_FLOAT >> 8) & 0xFF;
-    packet[offset++] = TYPE_FLOAT & 0xFF;             // Type: Float
-    packet[offset++] = 0x00; packet[offset++] = 0x04; // Length: 4 bytes
-    memcpy(&packet[offset], &emg1, 4); offset += 4;
+                if (max_val < 0.80f) rawResult = -1;
 
-    // SENSOR D2 CHUNK (TLV)
-    packet[offset++] = (TYPE_FLOAT >> 8) & 0xFF;
-    packet[offset++] = TYPE_FLOAT & 0xFF;             // Type: Float
-    packet[offset++] = 0x00; packet[offset++] = 0x04; // Length: 4 bytes
-    memcpy(&packet[offset], &emg2, 4); offset += 4;
+                if (rawResult == lastRawClassification) {
+                    classificationCounter++;
+                    if (classificationCounter >= CLASSIFICATION_STABILITY_REQUIRED) {
+                        confirmedClassification = rawResult;
 
-    // 3. Send to App
-    pTxCharacteristic->setValue(packet, 30);
-    pTxCharacteristic->notify();
+                        /**
+                         * GATED AI ACTUATION
+                         * Only move servos if explicitly enabled by "ai_start" command
+                         */
+                        if (ServoController::IsAIActuationEnabled()) {
+                            if (confirmedClassification == 0 || confirmedClassification == 2) {
+                                ServoController::MoveGrasp(255, 150);
+                            } else {
+                                ServoController::MoveRetract(255, 150);
+                            }
+                        }
+                    }
+                } else {
+                    lastRawClassification = rawResult;
+                    classificationCounter = 1;
+                }
+            }
+            featureIndex = 0;
+        }
 
-    delay(20); // 50Hz Transmission
-  }
+        uint8_t packet[36];
+        packet[0] = 0x01; packet[1] = 0x00; packet[2] = messageId++;
+        packet[3] = 0x10; packet[4] = 0x00; packet[5] = 30;
+
+        int offset = 6;
+        float sensors[] = {emg0, emg1, emg2};
+        for(int i=0; i<3; i++) {
+            packet[offset++] = (TYPE_FLOAT >> 8) & 0xFF; packet[offset++] = TYPE_FLOAT & 0xFF;
+            packet[offset++] = 0x00; packet[offset++] = 0x04;
+            memcpy(&packet[offset], &sensors[i], 4); offset += 4;
+        }
+        packet[offset++] = (TYPE_INT16 >> 8) & 0xFF; packet[offset++] = TYPE_INT16 & 0xFF;
+        packet[offset++] = 0x00; packet[offset++] = 0x02;
+        int16_t aiResult = (int16_t)confirmedClassification;
+        memcpy(&packet[offset], &aiResult, 2); offset += 2;
+
+        pTxCharacteristic->setValue(packet, 36);
+        pTxCharacteristic->notify();
+
+        delay(20);
+    }
 }
