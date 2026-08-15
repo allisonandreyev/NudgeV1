@@ -27,7 +27,7 @@
 // Grasp servos are 1, 2, 4, 5 (Handled by list in implementation)
 
 // PTO Calibration
-#define PTO_ENGAGED_ANGLE 30.0f
+#define PTO_ENGAGED_ANGLE 60.0f
 #define PTO_DISENGAGED_ANGLE 0.0f
 
 // Servo update rate

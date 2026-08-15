@@ -115,6 +115,9 @@ void loop() {
         float emg1 = analogRead(D1);
         float emg2 = analogRead(D2);
 
+        // 2. Manage AI Buffer (Interleaved: D0, D1, D2)
+        // Matches your new 3-sensor Edge Impulse model
+        features[featureIndex++] = emg0;
         features[featureIndex++] = emg1;
         features[featureIndex++] = emg2;
 
@@ -145,13 +148,18 @@ void loop() {
                         /**
                          * GATED AI ACTUATION
                          * Only move servos if explicitly enabled by "ai_start" command
+                         * "Sticky State" Implementation: UNKNOWN (-1) holds the current state.
                          */
                         if (ServoController::IsAIActuationEnabled()) {
                             if (confirmedClassification == 0 || confirmedClassification == 2) {
+                                // Pinch or Close detected -> Move to Grasp
                                 ServoController::MoveGrasp(255, 150);
-                            } else {
+                            } else if (confirmedClassification == 1 || confirmedClassification == 3) {
+                                // Rest or Open detected -> Move to Retract
                                 ServoController::MoveRetract(255, 150);
                             }
+                            // If confirmedClassification is -1 (UNKNOWN), we do nothing.
+                            // The servos will remain at their last commanded position.
                         }
                     }
                 } else {

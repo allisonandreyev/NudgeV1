@@ -10,7 +10,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9135cdeb-074b-44f0-8372-ee77a91b5318" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/App/android/app/src/main/java/com/nudge/app/ui/TherapySessionScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/App/android/app/src/main/java/com/nudge/app/ui/TherapySessionScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Software/XIAO_C6_Firmware/ServoController.h" beforeDir="false" afterPath="$PROJECT_DIR$/Software/XIAO_C6_Firmware/ServoController.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Software/XIAO_C6_Firmware/XIAO_C6_Firmware.ino" beforeDir="false" afterPath="$PROJECT_DIR$/Software/XIAO_C6_Firmware/XIAO_C6_Firmware.ino" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/reports/problems/problems-report.html" beforeDir="false" afterPath="$PROJECT_DIR$/build/reports/problems/problems-report.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
