@@ -5,10 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.nudge.app.data.UserStats
 import com.nudge.app.data.UserStatsDao
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class MinigameViewModel @Inject constructor(
     private val userStatsDao: UserStatsDao

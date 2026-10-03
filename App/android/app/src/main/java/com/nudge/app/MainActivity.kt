@@ -1,13 +1,11 @@
 package com.nudge.app
 
-import android.Manifest
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -15,7 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -24,22 +22,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.nudge.app.bluetooth.BluetoothViewModel
 import com.nudge.app.data.UserRole
-import com.nudge.app.ui.ConnectPhysicianScreen
-import com.nudge.app.ui.DeviceSelectScreen
-import com.nudge.app.ui.ForgotPasswordScreen
-import com.nudge.app.ui.AutomatedTrainingScreen
-import com.nudge.app.ui.LoginScreen
-import com.nudge.app.ui.MinigameScreen
-import com.nudge.app.ui.PatientDetailScreen
-import com.nudge.app.ui.PhysicianDashboardScreen
-import com.nudge.app.ui.ServoTestScreen
-import com.nudge.app.ui.AITestScreen
-import com.nudge.app.ui.SessionDetailScreen
-import com.nudge.app.ui.SettingsScreen
-import com.nudge.app.ui.SignUpScreen
-import com.nudge.app.ui.SummaryScreen
-import com.nudge.app.ui.TherapySessionScreen
-import com.nudge.app.ui.WelcomeScreen
+import com.nudge.app.ui.*
 import com.nudge.app.ui.theme.NudgeTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -50,10 +33,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             NudgeTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     NudgeApp()
                 }
             }
@@ -61,197 +41,169 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+object Routes {
+    const val WELCOME = "welcome"
+    const val LOGIN = "login"
+    const val SIGNUP = "signup"
+    const val HOME = "home"
+    const val CONNECT = "connect"
+    const val LIVE = "live"
+    const val THERAPY = "therapy"
+    const val GAME = "game"
+    const val TRAIN = "train"
+    const val CALIBRATE = "calibrate"
+    const val HAND_CONTROLS = "hand_controls"
+    const val CARE_TEAM = "care_team"
+    const val PHYSICIAN_HOME = "physician_home"
+    const val PATIENT = "patient/{username}"
+    const val SESSION = "session/{sessionId}"
+    const val SETTINGS = "settings"
+
+    fun patient(username: String) = "patient/$username"
+    fun session(id: Long) = "session/$id"
+}
+
+/** Demo mode signs in as this user so nothing touches real accounts. */
+const val DEMO_USERNAME = "demo"
+
 @Composable
 fun NudgeApp() {
     val navController = rememberNavController()
-    var userRole by remember { mutableStateOf<UserRole?>(null) }
-    var currentUsername by remember { mutableStateOf<String?>(null) }
-    val bluetoothViewModel: BluetoothViewModel = hiltViewModel()
+    var username by rememberSaveable { mutableStateOf<String?>(null) }
+    var role by rememberSaveable { mutableStateOf<UserRole?>(null) }
+    val bluetooth: BluetoothViewModel = hiltViewModel()
 
-    val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        arrayOf(
-            Manifest.permission.BLUETOOTH_SCAN,
-            Manifest.permission.BLUETOOTH_CONNECT,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        )
-    } else {
-        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+    LaunchedEffect(username) { bluetooth.setCurrentUser(username) }
+
+    fun signIn(name: String, userRole: UserRole) {
+        username = name
+        role = userRole
+        val home = if (userRole == UserRole.PHYSICIAN) Routes.PHYSICIAN_HOME else Routes.HOME
+        navController.navigate(home) { popUpTo(0) }
     }
 
-    val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ -> /* Permissions handled */ }
-
-    LaunchedEffect(currentUsername) {
-        launcher.launch(permissionsToRequest)
-        currentUsername?.let {
-            bluetoothViewModel.setCurrentUser(it)
-        }
+    fun signOut() {
+        bluetooth.disconnect()
+        username = null
+        role = null
+        navController.navigate(Routes.WELCOME) { popUpTo(0) }
     }
 
-    NavHost(navController = navController, startDestination = "welcome") {
-        composable("welcome") {
+    val user = username ?: ""
+    val back: () -> Unit = { navController.popBackStack() }
+
+    NavHost(
+        navController = navController,
+        startDestination = Routes.WELCOME,
+        enterTransition = { fadeIn() },
+        exitTransition = { fadeOut() }
+    ) {
+        composable(Routes.WELCOME) {
             WelcomeScreen(
-                onNavigateToLogin = { navController.navigate("login") },
-                onNavigateToSignUp = { navController.navigate("signup") },
-                onNavigateToTestData = {
-                    currentUsername = "test_user"
-                    userRole = UserRole.PATIENT
-                    navController.navigate("device_select")
+                onSignIn = { navController.navigate(Routes.LOGIN) },
+                onCreateAccount = { navController.navigate(Routes.SIGNUP) },
+                onTryDemo = {
+                    bluetooth.startDemo()
+                    signIn(DEMO_USERNAME, UserRole.PATIENT)
                 }
             )
         }
-        composable("login") {
-            LoginScreen(
-                onLoginSuccess = { username, role ->
-                    currentUsername = username
-                    userRole = role
-                    if (role == UserRole.PHYSICIAN) {
-                        navController.navigate("summary")
-                    } else {
-                        navController.navigate("device_select")
-                    }
-                },
-                onForgotPassword = { navController.navigate("forgot_password") }
-            )
-        }
-        composable("signup") {
-            SignUpScreen(onSignUpSuccess = { username ->
-                currentUsername = username
-                navController.navigate("login")
+        composable(Routes.LOGIN) {
+            LoginScreen(onBack = back, onLoggedIn = ::signIn, onCreateAccount = {
+                navController.navigate(Routes.SIGNUP) { popUpTo(Routes.WELCOME) }
             })
         }
-        composable("forgot_password") {
-            ForgotPasswordScreen(onResetSuccess = { navController.navigate("login") })
+        composable(Routes.SIGNUP) {
+            SignUpScreen(onBack = back, onSignedUp = ::signIn)
         }
-        composable("device_select") {
-            DeviceSelectScreen(
-                viewModel = bluetoothViewModel,
-                onDeviceSelected = { device ->
-                    bluetoothViewModel.connectToDevice(device)
-                    navController.navigate("summary")
-                },
-                onSkipConnection = {
-                    navController.navigate("summary")
-                }
+        composable(Routes.HOME) {
+            HomeScreen(
+                username = user,
+                bluetooth = bluetooth,
+                onNavigate = { navController.navigate(it) }
             )
         }
-        composable("summary") {
-            SummaryScreen(
-                viewModel = bluetoothViewModel,
-                userRole = userRole ?: UserRole.PATIENT,
-                username = currentUsername ?: "guest",
-                onConnectWithPhysician = {
-                    navController.navigate("connect_physician")
-                },
-                onStartTherapy = {
-                    navController.navigate("therapy")
-                },
-                onStartMinigame = {
-                    navController.navigate("minigame")
-                },
-                onViewPhysicianDashboard = {
-                    navController.navigate("physician_dashboard")
-                },
-                onStartTraining = {
-                    navController.navigate("training")
-                },
-                onStartServoTest = {
-                    navController.navigate("servo_test")
-                },
-                onStartAITest = {
-                    navController.navigate("ai_test")
-                },
-                onNavigateToSettings = {
-                    navController.navigate("settings")
-                }
+        composable(Routes.CONNECT) {
+            ConnectScreen(bluetooth = bluetooth, onBack = back, onConnected = back)
+        }
+        composable(Routes.LIVE) {
+            LiveSignalsScreen(
+                bluetooth = bluetooth,
+                onBack = back,
+                onConnect = { navController.navigate(Routes.CONNECT) },
+                onTrain = { navController.navigate(Routes.TRAIN) }
             )
         }
-        composable("therapy") {
+        composable(Routes.THERAPY) {
             TherapySessionScreen(
-                username = currentUsername ?: "guest",
-                bluetoothViewModel = bluetoothViewModel,
-                onSessionEnd = { navController.popBackStack() }
+                username = user,
+                bluetooth = bluetooth,
+                onBack = back,
+                onConnect = { navController.navigate(Routes.CONNECT) },
+                onCalibrate = { navController.navigate(Routes.CALIBRATE) }
             )
         }
-        composable("minigame") {
-            MinigameScreen(
-                username = currentUsername ?: "guest",
-                onGameEnd = { navController.popBackStack() }
+        composable(Routes.GAME) {
+            MinigameScreen(username = user, bluetooth = bluetooth, onBack = back)
+        }
+        composable(Routes.TRAIN) {
+            TrainAiScreen(
+                username = user,
+                bluetooth = bluetooth,
+                onBack = back,
+                onConnect = { navController.navigate(Routes.CONNECT) },
+                onTryIt = { navController.navigate(Routes.LIVE) { popUpTo(Routes.HOME) } },
+                onCalibrate = { navController.navigate(Routes.CALIBRATE) { popUpTo(Routes.HOME) } }
             )
         }
-        composable("connect_physician") {
-            ConnectPhysicianScreen(
-                username = currentUsername ?: "guest",
-                onConnectionSuccess = {
-                    navController.popBackStack()
-                }
+        composable(Routes.CALIBRATE) {
+            CalibrateScreen(
+                username = user,
+                bluetooth = bluetooth,
+                onBack = back,
+                onConnect = { navController.navigate(Routes.CONNECT) },
+                onRetrain = { navController.navigate(Routes.TRAIN) { popUpTo(Routes.HOME) } }
             )
         }
-        composable("physician_dashboard") {
-            PhysicianDashboardScreen(
-                physicianEmail = currentUsername ?: "",
-                onNavigateToPatientDetail = { patientUsername ->
-                    navController.navigate("patient_detail/$patientUsername")
-                },
-                onBack = { navController.popBackStack() }
-            )
-        }
-        composable("patient_detail/{patientUsername}") { backStackEntry ->
-            val patientUsername = backStackEntry.arguments?.getString("patientUsername") ?: ""
-            PatientDetailScreen(
-                patientUsername = patientUsername,
-                onBack = { navController.popBackStack() },
-                onNavigateToSessionDetail = { sessionId ->
-                    navController.navigate("session_detail/$sessionId")
-                }
-            )
-        }
-        composable("training") {
-            AutomatedTrainingScreen(
-                username = currentUsername ?: "guest",
-                bluetoothViewModel = bluetoothViewModel,
-                onBack = { navController.popBackStack() }
-            )
-        }
-        composable("servo_test") {
+        composable(Routes.HAND_CONTROLS) {
             ServoTestScreen(
-                viewModel = bluetoothViewModel,
-                onBack = { navController.popBackStack() }
+                bluetooth = bluetooth,
+                onBack = back,
+                onConnect = { navController.navigate(Routes.CONNECT) }
             )
         }
-        composable("ai_test") {
-            AITestScreen(
-                viewModel = bluetoothViewModel,
-                onBack = { navController.popBackStack() }
+        composable(Routes.CARE_TEAM) {
+            ConnectPhysicianScreen(username = user, onBack = back)
+        }
+        composable(Routes.PHYSICIAN_HOME) {
+            PhysicianDashboardScreen(
+                physicianUsername = user,
+                onOpenPatient = { navController.navigate(Routes.patient(it)) },
+                onSettings = { navController.navigate(Routes.SETTINGS) }
             )
         }
-        composable("session_detail/{sessionId}") { backStackEntry ->
-            val sessionId = backStackEntry.arguments?.getString("sessionId")?.toLongOrNull() ?: 0L
+        composable(Routes.PATIENT) { entry ->
+            PatientDetailScreen(
+                patientUsername = entry.arguments?.getString("username") ?: "",
+                onBack = back,
+                onOpenSession = { navController.navigate(Routes.session(it)) }
+            )
+        }
+        composable(Routes.SESSION) { entry ->
             SessionDetailScreen(
-                sessionId = sessionId,
-                onBack = { navController.popBackStack() }
+                sessionId = entry.arguments?.getString("sessionId")?.toLongOrNull() ?: 0L,
+                canEditNotes = role == UserRole.PHYSICIAN,
+                onBack = back
             )
         }
-        composable("settings") {
+        composable(Routes.SETTINGS) {
             SettingsScreen(
-                username = currentUsername ?: "guest",
-                role = userRole ?: UserRole.PATIENT,
-                onLogout = {
-                    currentUsername = null
-                    userRole = null
-                    navController.navigate("welcome") {
-                        popUpTo(0)
-                    }
-                },
-                onAccountDeleted = {
-                    currentUsername = null
-                    userRole = null
-                    navController.navigate("welcome") {
-                        popUpTo(0)
-                    }
-                },
-                onBack = { navController.popBackStack() }
+                username = user,
+                role = role ?: UserRole.PATIENT,
+                isDemo = user == DEMO_USERNAME,
+                onBack = back,
+                onHandControls = { navController.navigate(Routes.HAND_CONTROLS) },
+                onSignOut = ::signOut
             )
         }
     }

@@ -13,90 +13,92 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class TherapyState {
-    IDLE, SETUP, ACTIVE_REST, ACTIVE_CONTRACT, STOPPED
-}
+enum class TherapyState { SETUP, ACTIVE_REST, ACTIVE_CONTRACT, FINISHED }
 
 @HiltViewModel
 class TherapyViewModel @Inject constructor(
     private val therapySessionDao: TherapySessionDao
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(TherapyState.IDLE)
+    private val _uiState = MutableStateFlow(TherapyState.SETUP)
     val uiState = _uiState.asStateFlow()
 
     private val _currentSessionId = MutableStateFlow<Long?>(null)
     val currentSessionId = _currentSessionId.asStateFlow()
 
-    private val _timerSeconds = MutableStateFlow(5)
-    val timerSeconds = _timerSeconds.asStateFlow()
+    /** Fraction of the current phase remaining, 1 → 0 */
+    private val _phaseRemaining = MutableStateFlow(1f)
+    val phaseRemaining = _phaseRemaining.asStateFlow()
+
+    private val _rep = MutableStateFlow(0)
+    val rep = _rep.asStateFlow()
+
+    private val _totalReps = MutableStateFlow(10)
+    val totalReps = _totalReps.asStateFlow()
+
+    private val _durationSeconds = MutableStateFlow(0)
+    val durationSeconds = _durationSeconds.asStateFlow()
+
+    private val _restPosition = MutableStateFlow(RestPosition.OPENED)
+    val restPosition = _restPosition.asStateFlow()
+
+    private val _shared = MutableStateFlow(false)
+    val shared = _shared.asStateFlow()
 
     private var timerJob: Job? = null
+    private var startedAt = 0L
 
-    fun startSetup() {
-        _uiState.value = TherapyState.SETUP
-    }
-
-    fun startSession(username: String, restPosition: RestPosition) {
+    fun startSession(username: String, restPosition: RestPosition, reps: Int) {
+        _totalReps.value = reps
+        _restPosition.value = restPosition
         viewModelScope.launch {
-            val sessionId = therapySessionDao.insert(
-                TherapySession(
-                    username = username,
-                    restPosition = restPosition
-                )
-            )
-            _currentSessionId.value = sessionId
-            _uiState.value = TherapyState.ACTIVE_REST
-            startTimer()
+            _currentSessionId.value = therapySessionDao.insert(TherapySession(username = username, restPosition = restPosition))
+            startedAt = System.currentTimeMillis()
+            runTimer(reps)
         }
     }
 
-    private fun startTimer() {
+    private fun runTimer(reps: Int) {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
-            while (_uiState.value == TherapyState.ACTIVE_REST || _uiState.value == TherapyState.ACTIVE_CONTRACT) {
-                for (i in 5 downTo 1) {
-                    _timerSeconds.value = i
-                    delay(1000)
-                }
-                // Toggle state
-                _uiState.value = if (_uiState.value == TherapyState.ACTIVE_REST) {
-                    TherapyState.ACTIVE_CONTRACT
-                } else {
-                    TherapyState.ACTIVE_REST
+            for (r in 1..reps) {
+                _rep.value = r
+                for (phase in listOf(TherapyState.ACTIVE_REST, TherapyState.ACTIVE_CONTRACT)) {
+                    _uiState.value = phase
+                    val steps = (PHASE_MS / TICK_MS).toInt()
+                    for (i in steps downTo 1) {
+                        _phaseRemaining.value = i / steps.toFloat()
+                        delay(TICK_MS)
+                    }
                 }
             }
+            finish()
         }
     }
 
     fun stopSession() {
-        val sessionId = _currentSessionId.value ?: return
-        viewModelScope.launch {
-            timerJob?.cancel()
-            val session = therapySessionDao.getSessionById(sessionId)
-            if (session != null) {
-                therapySessionDao.update(session.copy(endTime = System.currentTimeMillis()))
-            }
-            _uiState.value = TherapyState.STOPPED
-        }
-    }
-
-    fun uploadSession() {
-        val sessionId = _currentSessionId.value ?: return
-        viewModelScope.launch {
-            val session = therapySessionDao.getSessionById(sessionId)
-            if (session != null) {
-                // In a real app, this would trigger a network upload.
-                // Here we just mark it as uploaded locally.
-                therapySessionDao.update(session.copy(isUploaded = true))
-            }
-        }
-    }
-
-    fun reset() {
-        _uiState.value = TherapyState.IDLE
-        _currentSessionId.value = null
-        _timerSeconds.value = 5
         timerJob?.cancel()
+        viewModelScope.launch { finish() }
+    }
+
+    private suspend fun finish() {
+        val id = _currentSessionId.value ?: return
+        val end = System.currentTimeMillis()
+        _durationSeconds.value = ((end - startedAt) / 1000).toInt()
+        therapySessionDao.getSessionById(id)?.let { therapySessionDao.update(it.copy(endTime = end)) }
+        _uiState.value = TherapyState.FINISHED
+    }
+
+    fun setShared(shared: Boolean) {
+        val id = _currentSessionId.value ?: return
+        _shared.value = shared
+        viewModelScope.launch {
+            therapySessionDao.getSessionById(id)?.let { therapySessionDao.update(it.copy(isUploaded = shared)) }
+        }
+    }
+
+    companion object {
+        const val PHASE_MS = 5000L
+        private const val TICK_MS = 50L
     }
 }

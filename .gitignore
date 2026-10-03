@@ -1,3 +1,17 @@
 *.cache
 *.vscode
 *.hprof
+.DS_Store
+
+# Build output
+build/
+.gradle/
+.kotlin/
+.pio/
+.venv/
+__pycache__/
+
+# Machine-specific
+local.properties
+.idea/
+*.iml

@@ -1,7 +1,7 @@
 /**
  * Nudge Wearable Firmware - XIAO ESP32-C6
- * AI Inference Integrated (D1, D2 Sensors)
  * Triple EMG Sensor Stream (D0, D1, D2)
+ * On-device gesture model trained by the app (see GestureModel.h)
  * Remote Servo Control (0-5)
  * Using Custom Binary TLV Protocol
  */
@@ -11,9 +11,7 @@
 #include <BLEServer.h>
 #include <BLE2902.h>
 #include "ServoController.h"
-
-// Edge Impulse library header for nudgeml_v2
-#include <NudgeML_V2_inferencing.h>
+#include "GestureModel.h"
 
 // UUIDs - MUST MATCH ANDROID APP
 #define SERVICE_UUID        "000B1E53-D47A-CEDE-DE57-000000008488"
@@ -27,15 +25,15 @@ uint8_t messageId = 0;
 
 const uint16_t TYPE_FLOAT = 0x1130;
 const uint16_t TYPE_INT16 = 0x1112;
+const uint16_t TYPE_UINT16 = 0x1116;
 
-// --- AI BUFFERING & SMOOTHING ---
-float features[EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE];
-int featureIndex = 0;
-
-int classificationCounter = 0;
+// --- AI SMOOTHING ---
+const float CONFIDENCE_REQUIRED = 0.80f;
 const int CLASSIFICATION_STABILITY_REQUIRED = 3;
+int classificationCounter = 0;
 int lastRawClassification = -1;
 int confirmedClassification = -1;
+int actuatedClassification = -1;
 
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
@@ -44,6 +42,8 @@ class MyServerCallbacks: public BLEServerCallbacks {
     };
     void onDisconnect(BLEServer* pServer) {
         deviceConnected = false;
+        // Never keep moving the hand on AI output once the app is gone
+        ServoController::EnableAIActuation(false);
         Serial.println(">> App Disconnected");
         BLEDevice::startAdvertising();
     }
@@ -53,6 +53,7 @@ class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
         String value = pCharacteristic->getValue();
         if (value.length() > 0) {
+            if (GestureModel::HandleCommand(value)) return;
             Serial.print("Command Received: ");
             Serial.println(value);
             ServoController::ParseCommand(value);
@@ -65,6 +66,7 @@ void setup() {
     analogReadResolution(12);
     Wire.begin();
     ServoController::Init();
+    GestureModel::Init();
 
     /**
      * SAFETY BOOT SEQUENCE
@@ -85,6 +87,8 @@ void setup() {
     Serial.println(">> Boot Sequence Complete.");
 
     BLEDevice::init("Nudge-C6");
+    // Room for model upload lines; the app keeps each write under 180 bytes
+    BLEDevice::setMTU(247);
     pServer = BLEDevice::createServer();
     pServer->setCallbacks(new MyServerCallbacks());
 
@@ -105,77 +109,62 @@ void setup() {
     pService->start();
     BLEDevice::getAdvertising()->addServiceUUID(SERVICE_UUID);
     pServer->getAdvertising()->start();
-    Serial.println(">> Nudge Ready (Sensors + Servos + TinyML)");
+    Serial.println(">> Nudge Ready (Sensors + Servos + Gesture Model)");
+}
+
+void updateGesture() {
+    int rawResult = -1;
+    float probability = 0;
+    if (!GestureModel::Predict(rawResult, probability)) {
+        confirmedClassification = -1;
+        return;
+    }
+    if (probability < CONFIDENCE_REQUIRED) rawResult = -1;
+
+    if (rawResult != lastRawClassification) {
+        lastRawClassification = rawResult;
+        classificationCounter = 1;
+        return;
+    }
+    if (++classificationCounter < CLASSIFICATION_STABILITY_REQUIRED) return;
+    confirmedClassification = rawResult;
+
+    /**
+     * GATED AI ACTUATION
+     * Only move servos if explicitly enabled by "ai_start" command, and only when the
+     * gesture changes. UNKNOWN (-1) holds the current position.
+     */
+    if (!ServoController::IsAIActuationEnabled()) {
+        actuatedClassification = -1;
+        return;
+    }
+    if (confirmedClassification == -1 || confirmedClassification == actuatedClassification) return;
+    actuatedClassification = confirmedClassification;
+
+    if (confirmedClassification == 0 || confirmedClassification == 2) {
+        // Close or Pinch detected -> Move to Grasp
+        ServoController::MoveGrasp(255, 150);
+    } else {
+        // Open or Rest detected -> Move to Retract
+        ServoController::MoveRetract(255, 150);
+    }
 }
 
 void loop() {
     if (deviceConnected) {
         // 1. Read Sensors
-        float emg0 = analogRead(D0);
-        float emg1 = analogRead(D1);
-        float emg2 = analogRead(D2);
+        float sensors[] = {(float)analogRead(D0), (float)analogRead(D1), (float)analogRead(D2)};
 
-        // 2. Manage AI Buffer (Interleaved: D0, D1, D2)
-        // Matches your new 3-sensor Edge Impulse model
-        features[featureIndex++] = emg0;
-        features[featureIndex++] = emg1;
-        features[featureIndex++] = emg2;
+        // 2. Classify the last 200 ms
+        GestureModel::Push(sensors);
+        updateGesture();
 
-        if (featureIndex >= EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE) {
-            signal_t signal;
-            numpy::signal_from_buffer(features, EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE, &signal);
-
-            ei_impulse_result_t result = { 0 };
-            EI_IMPULSE_ERROR res = run_classifier(&signal, &result, false);
-
-            if (res == EI_IMPULSE_OK) {
-                float max_val = 0;
-                int rawResult = -1;
-                for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
-                    if (result.classification[ix].value > max_val) {
-                        max_val = result.classification[ix].value;
-                        rawResult = (int)ix;
-                    }
-                }
-
-                if (max_val < 0.80f) rawResult = -1;
-
-                if (rawResult == lastRawClassification) {
-                    classificationCounter++;
-                    if (classificationCounter >= CLASSIFICATION_STABILITY_REQUIRED) {
-                        confirmedClassification = rawResult;
-
-                        /**
-                         * GATED AI ACTUATION
-                         * Only move servos if explicitly enabled by "ai_start" command
-                         * "Sticky State" Implementation: UNKNOWN (-1) holds the current state.
-                         */
-                        if (ServoController::IsAIActuationEnabled()) {
-                            if (confirmedClassification == 0 || confirmedClassification == 2) {
-                                // Pinch or Close detected -> Move to Grasp
-                                ServoController::MoveGrasp(255, 150);
-                            } else if (confirmedClassification == 1 || confirmedClassification == 3) {
-                                // Rest or Open detected -> Move to Retract
-                                ServoController::MoveRetract(255, 150);
-                            }
-                            // If confirmedClassification is -1 (UNKNOWN), we do nothing.
-                            // The servos will remain at their last commanded position.
-                        }
-                    }
-                } else {
-                    lastRawClassification = rawResult;
-                    classificationCounter = 1;
-                }
-            }
-            featureIndex = 0;
-        }
-
-        uint8_t packet[36];
+        // 3. Send readings, gesture and model id to the app
+        uint8_t packet[42];
         packet[0] = 0x01; packet[1] = 0x00; packet[2] = messageId++;
-        packet[3] = 0x10; packet[4] = 0x00; packet[5] = 30;
+        packet[3] = 0x10; packet[4] = 0x00; packet[5] = 36;
 
         int offset = 6;
-        float sensors[] = {emg0, emg1, emg2};
         for(int i=0; i<3; i++) {
             packet[offset++] = (TYPE_FLOAT >> 8) & 0xFF; packet[offset++] = TYPE_FLOAT & 0xFF;
             packet[offset++] = 0x00; packet[offset++] = 0x04;
@@ -186,7 +175,12 @@ void loop() {
         int16_t aiResult = (int16_t)confirmedClassification;
         memcpy(&packet[offset], &aiResult, 2); offset += 2;
 
-        pTxCharacteristic->setValue(packet, 36);
+        packet[offset++] = (TYPE_UINT16 >> 8) & 0xFF; packet[offset++] = TYPE_UINT16 & 0xFF;
+        packet[offset++] = 0x00; packet[offset++] = 0x02;
+        uint16_t modelId = GestureModel::ModelId();
+        memcpy(&packet[offset], &modelId, 2); offset += 2;
+
+        pTxCharacteristic->setValue(packet, sizeof(packet));
         pTxCharacteristic->notify();
 
         delay(20);

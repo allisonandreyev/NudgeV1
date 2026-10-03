@@ -1,185 +1,88 @@
 package com.nudge.app.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonSearch
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.nudge.app.data.ConnectionStatus
-import com.nudge.app.data.PhysicianConnection
-import com.nudge.app.ui.theme.MedicalGradient
+import com.nudge.app.ui.components.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhysicianDashboardScreen(
-    physicianEmail: String,
-    onNavigateToPatientDetail: (String) -> Unit,
-    onBack: () -> Unit,
+    physicianUsername: String,
+    onOpenPatient: (String) -> Unit,
+    onSettings: () -> Unit,
     viewModel: PhysicianViewModel = hiltViewModel()
 ) {
     val connections by viewModel.physicianConnections.collectAsState()
-    
-    LaunchedEffect(physicianEmail) {
-        viewModel.setPhysicianContext(physicianEmail)
-    }
+    LaunchedEffect(physicianUsername) { viewModel.setPhysicianContext(physicianUsername) }
 
-    val pendingRequests = connections.filter { it.status == ConnectionStatus.PENDING }
-    val myPatients = connections.filter { it.status == ConnectionStatus.ACCEPTED }
+    val pending = connections.filter { it.status == ConnectionStatus.PENDING }
+    val patients = connections.filter { it.status == ConnectionStatus.ACCEPTED }
 
-    Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(brush = MedicalGradient)
-            .safeDrawingPadding(),
-        topBar = {
-            TopAppBar(
-                title = { Text("Physician Dashboard", fontWeight = FontWeight.Bold, color = Color.White) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.Close, contentDescription = "Back", tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = Color.Transparent
+    NudgeScreen(
+        title = "Patients",
+        actions = {
+            IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "Settings") }
+        }
     ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(brush = MedicalGradient)
-                .padding(padding)
+        LazyColumn(
+            modifier = Modifier.padding(padding).fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                // Pending Requests Section
-                if (pendingRequests.isNotEmpty()) {
-                    item {
-                        Text(
-                            "PENDING REQUESTS",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+            if (pending.isNotEmpty()) {
+                item { SectionLabel("Requests") }
+                items(pending, key = { "p-" + it.patientUsername }) { request ->
+                    NudgeCard(Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconBadge(Icons.Default.Person)
+                            Spacer(Modifier.width(16.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(request.patientUsername, style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "Wants to share their sessions",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SecondaryButton("Decline", onClick = { viewModel.rejectConnection(request) }, modifier = Modifier.weight(1f))
+                            PrimaryButton("Accept", onClick = { viewModel.acceptConnection(request) }, modifier = Modifier.weight(1f))
+                        }
                     }
-                    items(pendingRequests) { request ->
-                        ConnectionRequestItem(
-                            request = request,
-                            onAccept = { viewModel.acceptConnection(request) },
-                            onReject = { viewModel.rejectConnection(request) }
-                        )
-                    }
-                    item { Spacer(modifier = Modifier.height(24.dp)) }
                 }
+                item { Spacer(Modifier.height(12.dp)) }
+            }
 
-                // My Patients Section
+            item { SectionLabel("Your patients") }
+            if (patients.isEmpty()) {
                 item {
-                    Text(
-                        "MY PATIENTS",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                    EmptyState(
+                        icon = Icons.Default.PersonSearch,
+                        title = "No patients yet",
+                        message = "Patients add you from their Care team screen using your username: $physicianUsername"
                     )
                 }
-
-                if (myPatients.isEmpty()) {
-                    item {
-                        Text(
-                            "No connected patients yet.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.5f),
-                            modifier = Modifier.padding(vertical = 16.dp)
-                        )
-                    }
-                } else {
-                    items(myPatients) { patient ->
-                        PatientItem(
-                            patient = patient,
-                            onClick = { onNavigateToPatientDetail(patient.patientUsername) }
-                        )
-                    }
-                }
             }
-        }
-    }
-}
-
-@Composable
-fun ConnectionRequestItem(
-    request: PhysicianConnection,
-    onAccept: () -> Unit,
-    onReject: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(40.dp), tint = Color.White)
-            Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
-                Text(request.patientUsername, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("Requested connection", fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f))
+            items(patients, key = { it.patientUsername }) { patient ->
+                ActionRow(
+                    icon = Icons.Default.Person,
+                    title = patient.patientUsername,
+                    onClick = { onOpenPatient(patient.patientUsername) }
+                )
             }
-            IconButton(onClick = onAccept) {
-                Icon(Icons.Default.Check, contentDescription = "Accept", tint = Color(0xFF00E676))
-            }
-            IconButton(onClick = onReject) {
-                Icon(Icons.Default.Close, contentDescription = "Reject", tint = Color(0xFFFF5252))
-            }
-        }
-    }
-}
-
-@Composable
-fun PatientItem(
-    patient: PhysicianConnection,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(40.dp), tint = Color.White)
-            Text(
-                patient.patientUsername,
-                modifier = Modifier.padding(start = 16.dp),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp,
-                color = Color.White
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Text("View Details", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

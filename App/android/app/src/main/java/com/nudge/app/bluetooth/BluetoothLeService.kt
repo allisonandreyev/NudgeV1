@@ -6,14 +6,20 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.bluetooth.*
+import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Binder
+import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,6 +45,9 @@ class BluetoothLeService : Service() {
     private val _connectionState = MutableStateFlow(BluetoothProfile.STATE_DISCONNECTED)
     val connectionState = _connectionState.asStateFlow()
 
+    private val _connectedName = MutableStateFlow<String?>(null)
+    val connectedName = _connectedName.asStateFlow()
+
     private val _receivedPackets = MutableSharedFlow<Packet>(extraBufferCapacity = 64)
     val receivedPackets = _receivedPackets.asSharedFlow()
 
@@ -59,7 +68,27 @@ class BluetoothLeService : Service() {
         bluetoothAdapter = bluetoothManager.adapter
         
         createNotificationChannel()
-        startForeground(1, createNotification())
+    }
+
+    /**
+     * Keeps the connection alive in the background. Android 14+ only allows this once
+     * Bluetooth permission is granted, so it happens on connect rather than on create.
+     */
+    private fun enterForeground() {
+        try {
+            ServiceCompat.startForeground(
+                this,
+                1,
+                createNotification(),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE else 0
+            )
+        } catch (e: Exception) {
+            Log.w("BLE", "Could not enter foreground; connection may drop in background", e)
+        }
+    }
+
+    private fun leaveForeground() {
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
     }
 
     private fun createNotificationChannel() {
@@ -74,19 +103,27 @@ class BluetoothLeService : Service() {
 
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, "nudge_channel")
-            .setContentTitle("Nudge Tracking")
-            .setContentText("Tracking data from ESP32...")
+            .setContentTitle("Nudge is connected")
+            .setContentText("Receiving data from your wearable")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .build()
     }
 
     fun startScanning() {
         _discoveredDevices.value = emptyList()
-        bluetoothAdapter?.bluetoothLeScanner?.startScan(scanCallback)
+        try {
+            bluetoothAdapter?.bluetoothLeScanner?.startScan(scanCallback)
+        } catch (e: SecurityException) {
+            Log.w("BLE", "Scan needs Bluetooth permission", e)
+        }
     }
 
     fun stopScanning() {
-        bluetoothAdapter?.bluetoothLeScanner?.stopScan(scanCallback)
+        try {
+            bluetoothAdapter?.bluetoothLeScanner?.stopScan(scanCallback)
+        } catch (e: SecurityException) {
+            Log.w("BLE", "Stop scan needs Bluetooth permission", e)
+        }
     }
 
     fun connectToDevice(address: String) {
@@ -96,6 +133,9 @@ class BluetoothLeService : Service() {
             it.close()
         }
         val device = bluetoothAdapter?.getRemoteDevice(address) ?: return
+        enterForeground()
+        _connectionState.value = BluetoothProfile.STATE_CONNECTING
+        _connectedName.value = device.name
         bluetoothGatt = device.connectGatt(this, false, gattCallback)
     }
 
@@ -103,42 +143,69 @@ class BluetoothLeService : Service() {
         bluetoothGatt?.disconnect()
     }
 
+    // Android allows one GATT write in flight at a time, so writes go through a queue
+    private val writeQueue = kotlin.collections.ArrayDeque<ByteArray>()
+    private var writeInFlight = false
+    private var writeSeq = 0
+    private val handler = Handler(Looper.getMainLooper())
+
     fun sendMessage(data: ByteArray) {
+        synchronized(writeQueue) { writeQueue.addLast(data) }
+        handler.post { pumpWrites() }
+    }
+
+    private fun pumpWrites() {
+        val data = synchronized(writeQueue) {
+            if (writeInFlight) return
+            writeQueue.removeFirstOrNull() ?: return
+        }
+        val characteristic = bluetoothGatt?.getService(SERVICE_UUID)?.getCharacteristic(CHAR_RX_UUID)
         val gatt = bluetoothGatt
-        if (gatt == null) {
-            Log.e("BLE", "Cannot send message: GATT is null")
+        if (gatt == null || characteristic == null) {
+            Log.w("BLE", "Not connected, dropping ${data.size} byte command")
+            handler.post { pumpWrites() }
             return
         }
-        
-        // Both TX and RX characteristics now live in the same Service
-        val service = gatt.getService(SERVICE_UUID)
-        if (service == null) {
-            Log.e("BLE", "Nudge Service not found: $SERVICE_UUID")
-            return
-        }
-        
-        val characteristic = service.getCharacteristic(CHAR_RX_UUID)
-        if (characteristic != null) {
-            Log.d("BLE", "Sending ${data.size} bytes to characteristic $CHAR_RX_UUID using WRITE_TYPE_DEFAULT")
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                gatt.writeCharacteristic(characteristic, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
-            } else {
-                @Suppress("DEPRECATION")
-                characteristic.value = data
-                @Suppress("DEPRECATION")
-                characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                val success = @Suppress("DEPRECATION") gatt.writeCharacteristic(characteristic)
-                Log.d("BLE", "writeCharacteristic success: $success")
-            }
+        val started = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            gatt.writeCharacteristic(characteristic, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) == BluetoothStatusCodes.SUCCESS
         } else {
-            Log.e("BLE", "RX Characteristic not found: $CHAR_RX_UUID")
+            @Suppress("DEPRECATION")
+            characteristic.value = data
+            characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            @Suppress("DEPRECATION")
+            gatt.writeCharacteristic(characteristic)
+        }
+        if (!started) {
+            Log.e("BLE", "Write could not start, dropping command")
+            handler.post { pumpWrites() }
+            return
+        }
+        synchronized(writeQueue) { writeInFlight = true }
+        // If the stack never confirms, move on rather than stall every later command
+        val seq = ++writeSeq
+        handler.postDelayed({ if (seq == writeSeq) onWriteDone() }, WRITE_TIMEOUT_MS)
+    }
+
+    private fun onWriteDone() {
+        writeSeq++
+        synchronized(writeQueue) { writeInFlight = false }
+        handler.post { pumpWrites() }
+    }
+
+    private fun clearWrites() {
+        writeSeq++
+        synchronized(writeQueue) {
+            writeQueue.clear()
+            writeInFlight = false
         }
     }
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val device = result.device
-            if (device.name != null && !_discoveredDevices.value.any { it.address == device.address }) {
+            val advertisesNudge = result.scanRecord?.serviceUuids?.any { it.uuid == SERVICE_UUID } == true
+            val isNudge = advertisesNudge || device.name?.startsWith("Nudge", ignoreCase = true) == true
+            if (isNudge && !_discoveredDevices.value.any { it.address == device.address }) {
                 _discoveredDevices.value = _discoveredDevices.value + device
             }
         }
@@ -152,6 +219,9 @@ class BluetoothLeService : Service() {
                 gatt.requestMtu(517)
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.i("BLE", "Disconnected from GATT server.")
+                _connectedName.value = null
+                clearWrites()
+                leaveForeground()
             }
         }
 
@@ -220,15 +290,15 @@ class BluetoothLeService : Service() {
         }
 
         override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                Log.i("BLE", "Write SUCCESS to ${characteristic.uuid}")
-            } else {
+            if (status != BluetoothGatt.GATT_SUCCESS) {
                 Log.e("BLE", "Write FAILED to ${characteristic.uuid} with status: $status")
             }
+            handler.post { onWriteDone() }
         }
 
         @Deprecated("Deprecated in Java")
         override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
+            @Suppress("DEPRECATION")
             handleDataChange(characteristic.value)
         }
         
@@ -262,5 +332,6 @@ class BluetoothLeService : Service() {
         val SERVICE_UUID: UUID = UUID.fromString("000B1E53-D47A-CEDE-DE57-000000008488")
         val CHAR_TX_UUID: UUID = UUID.fromString("00008488-D47A-CEDE-0000-466178454d47")
         val CHAR_RX_UUID: UUID = UUID.fromString("00008288-D47A-CEDE-0000-526563436d64")
+        private const val WRITE_TIMEOUT_MS = 1500L
     }
 }

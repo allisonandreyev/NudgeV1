@@ -1,205 +1,138 @@
 package com.nudge.app.ui
 
-import android.bluetooth.BluetoothProfile
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.BackHand
+import androidx.compose.material.icons.filled.FrontHand
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.nudge.app.bluetooth.BluetoothViewModel
-import com.nudge.app.ui.theme.MedicalGradient
+import com.nudge.app.bluetooth.DeviceStatus
+import com.nudge.app.ui.components.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Motor numbers match the firmware: 0 is the clutch, 3 opens the hand, the rest close it
+private val SERVO_NAMES = listOf("Clutch", "Grip 1", "Grip 2", "Opener", "Grip 3", "Grip 4")
+
+/** Manual control of the wearable's motors, for setup and troubleshooting. */
 @Composable
 fun ServoTestScreen(
-    viewModel: BluetoothViewModel,
-    onBack: () -> Unit
+    bluetooth: BluetoothViewModel,
+    onBack: () -> Unit,
+    onConnect: () -> Unit
 ) {
-    val connectionState by viewModel.connectionState.collectAsState()
-    val isConnected = connectionState == BluetoothProfile.STATE_CONNECTED
+    val status by bluetooth.deviceStatus.collectAsState()
+    val online = status == DeviceStatus.Connected || status == DeviceStatus.Demo
+    var speed by remember { mutableFloatStateOf(100f) }
+    val angles = remember { mutableStateListOf(0f, 0f, 0f, 0f, 0f, 0f) }
+    var showAdvanced by remember { mutableStateOf(false) }
 
-    var globalSpeed by remember { mutableFloatStateOf(100f) }
-    val servoAngles = remember { mutableStateListOf(0f, 0f, 0f, 0f, 0f, 0f) }
-
-    Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(brush = MedicalGradient)
-            .safeDrawingPadding(),
-        topBar = {
-            TopAppBar(
-                title = { Text("Hardware Calibration", fontWeight = FontWeight.Bold, color = Color.White) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    }
-                },
-                actions = {
-                    if (isConnected) {
-                        IconButton(onClick = { viewModel.sendCommand("stop") }) {
-                            Icon(Icons.Default.Dangerous, contentDescription = "EMERGENCY STOP", tint = Color.Red)
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = Color.Transparent
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            if (!isConnected) {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Red.copy(alpha = 0.1f))
-                ) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Warning, contentDescription = null, tint = Color.Red)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Wearable Disconnected. Commands will not be sent.", color = Color.White, fontSize = 14.sp)
-                    }
-                }
-            }
-
-            // Global Speed Controller
-            CalibrationCard(title = "Global Movement Speed") {
-                Column {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Speed: ${globalSpeed.toInt()} deg/s", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
-                    }
-                    Slider(
-                        value = globalSpeed,
-                        onValueChange = { globalSpeed = it },
-                        valueRange = 10f..300f,
-                        colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.primary, activeTrackColor = MaterialTheme.colorScheme.primary)
+    NudgeScreen(
+        title = "Hand controls",
+        onBack = onBack,
+        bottomBar = {
+            if (online) {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    PrimaryButton(
+                        "Stop all motors",
+                        destructive = true,
+                        onClick = { bluetooth.sendCommand("stop") },
+                        modifier = Modifier.navigationBarsPadding().padding(16.dp)
                     )
                 }
             }
+        }
+    ) { padding ->
+        Column(
+            Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+        ) {
+            if (!online) {
+                NotConnectedBanner(onConnect)
+                Spacer(Modifier.height(20.dp))
+            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            SectionLabel("Whole hand")
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                PrimaryButton(
+                    "Close",
+                    icon = Icons.Default.FrontHand,
+                    enabled = online,
+                    onClick = { bluetooth.sendCommand("grasp 255 ${speed.toInt()}") },
+                    modifier = Modifier.weight(1f)
+                )
+                PrimaryButton(
+                    "Open",
+                    icon = Icons.Default.BackHand,
+                    enabled = online,
+                    onClick = { bluetooth.sendCommand("retract 255 ${speed.toInt()}") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SecondaryButton(
+                    "Engage clutch",
+                    icon = Icons.Default.Link,
+                    enabled = online,
+                    onClick = { bluetooth.sendCommand("engage") },
+                    modifier = Modifier.weight(1f)
+                )
+                SecondaryButton(
+                    "Release",
+                    icon = Icons.Default.LinkOff,
+                    enabled = online,
+                    onClick = { bluetooth.sendCommand("disengage") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
-            // High Level Commands
-            CalibrationCard(title = "System Batch Commands") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { viewModel.sendCommand("engage") },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                        ) {
-                            Text("Engage PTO", fontSize = 12.sp)
-                        }
-                        Button(
-                            onClick = { viewModel.sendCommand("disengage") },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f))
-                        ) {
-                            Text("Disengage PTO", fontSize = 12.sp)
-                        }
-                    }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { viewModel.sendCommand("grasp 255 ${globalSpeed.toInt()}") },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676))
-                        ) {
-                            Text("Full Grasp", fontSize = 12.sp, color = Color.Black)
-                        }
-                        Button(
-                            onClick = { viewModel.sendCommand("retract 255 ${globalSpeed.toInt()}") },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9100))
-                        ) {
-                            Text("Full Retract", fontSize = 12.sp, color = Color.Black)
+            Spacer(Modifier.height(24.dp))
+            SectionLabel("Speed")
+            NudgeCard(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Movement speed", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    Text("${speed.toInt()}°/s", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                }
+                Slider(value = speed, onValueChange = { speed = it }, valueRange = 10f..300f)
+            }
+
+            Spacer(Modifier.height(16.dp))
+            TextButton(onClick = { showAdvanced = !showAdvanced }) {
+                Text(if (showAdvanced) "Hide individual motors" else "Show individual motors")
+            }
+            if (showAdvanced) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    angles.forEachIndexed { index, angle ->
+                        NudgeCard(Modifier.fillMaxWidth()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(SERVO_NAMES[index], style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                                Text("${angle.toInt()}°", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Slider(
+                                value = angle,
+                                enabled = online,
+                                valueRange = 0f..255f,
+                                onValueChange = { angles[index] = it },
+                                // Send once when the finger lifts, not on every pixel of the drag
+                                onValueChangeFinished = {
+                                    bluetooth.sendCommand("Servo $index ${angles[index].toInt()} ${speed.toInt()}")
+                                }
+                            )
                         }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                "INDIVIDUAL SERVO OVERRIDE",
-                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            // Individual Sliders
-            servoAngles.forEachIndexed { index, angle ->
-                val label = when(index) {
-                    0 -> "PTO (ID 0)"
-                    5 -> "Retract (ID 5)"
-                    else -> "Grasp Finger ${index} (ID $index)"
-                }
-                
-                IndividualServoControl(
-                    label = label,
-                    angle = angle,
-                    onAngleChange = { newAngle -> 
-                        servoAngles[index] = newAngle
-                        viewModel.sendCommand("Servo $index ${newAngle.toInt()} ${globalSpeed.toInt()}")
-                    }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-            
-            Spacer(modifier = Modifier.height(32.dp))
-        }
-    }
-}
-
-@Composable
-fun CalibrationCard(title: String, content: @Composable () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-            Spacer(modifier = Modifier.height(12.dp))
-            content()
-        }
-    }
-}
-
-@Composable
-fun IndividualServoControl(label: String, angle: Float, onAngleChange: (Float) -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.2f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(label, color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                Text("${angle.toInt()}°", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold)
-            }
-            Slider(
-                value = angle,
-                onValueChange = onAngleChange,
-                valueRange = 0f..255f,
-                colors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = MaterialTheme.colorScheme.primary
-                )
-            )
+            Spacer(Modifier.height(24.dp))
         }
     }
 }

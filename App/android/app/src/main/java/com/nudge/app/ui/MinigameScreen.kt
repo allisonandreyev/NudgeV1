@@ -2,236 +2,194 @@ package com.nudge.app.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.nudge.app.bluetooth.BluetoothViewModel
+import com.nudge.app.ui.components.PrimaryButton
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
-enum class GameState {
-    START, PLAYING, GAME_OVER
-}
+private enum class GameState { START, PLAYING, GAME_OVER }
 
-data class Pipe(
-    val x: Float,
-    val gapY: Float,
-    val width: Float = 150f,
-    val gapHeight: Float = 450f // Slightly larger gap for easier play
-)
+private data class Pipe(val x: Float, val gapY: Float, val scored: Boolean = false)
+
+private const val PIPE_WIDTH = 150f
+private const val GAP_HEIGHT = 470f
+private const val BIRD_X = 200f
+private const val BIRD_RADIUS = 30f
+private const val GRAVITY = 0.34f
+private const val JUMP = -9.5f
+private const val PIPE_SPEED = 3.5f
+
+private val Sky = Brush.verticalGradient(listOf(Color(0xFF7DD3FC), Color(0xFFE0F2FE)))
+private val PipeColor = Color(0xFF22C55E)
+private val PipeEdge = Color(0xFF15803D)
+private val Bird = Color(0xFFFACC15)
 
 @Composable
 fun MinigameScreen(
     username: String,
-    onGameEnd: () -> Unit,
-    viewModel: MinigameViewModel = hiltViewModel(),
-    bluetoothViewModel: com.nudge.app.bluetooth.BluetoothViewModel = hiltViewModel()
+    bluetooth: BluetoothViewModel,
+    onBack: () -> Unit,
+    viewModel: MinigameViewModel = hiltViewModel()
 ) {
-    var gameState by remember { mutableStateOf(GameState.START) }
-    var birdY by remember { mutableStateOf(500f) }
-    var birdVelocity by remember { mutableStateOf(0f) }
+    var state by remember { mutableStateOf(GameState.START) }
+    var birdY by remember { mutableFloatStateOf(500f) }
+    var velocity by remember { mutableFloatStateOf(0f) }
     var pipes by remember { mutableStateOf(listOf<Pipe>()) }
-    var score by remember { mutableStateOf(0) }
+    var score by remember { mutableIntStateOf(0) }
+    var width by remember { mutableFloatStateOf(1080f) }
+    var height by remember { mutableFloatStateOf(1920f) }
     val highScore by viewModel.highScore.collectAsState()
+    val gesture by bluetooth.lastGesture.collectAsState()
 
-    val emgD0 by bluetoothViewModel.emgDataD0.collectAsState()
-    val lastGesture by bluetoothViewModel.lastGesture.collectAsState()
+    LaunchedEffect(username) { viewModel.setUsername(username) }
 
-    var screenWidth by remember { mutableStateOf(1080f) }
-    var screenHeight by remember { mutableStateOf(1920f) }
+    fun start() {
+        birdY = height / 3f
+        velocity = 0f
+        pipes = emptyList()
+        score = 0
+        state = GameState.PLAYING
+    }
 
-    // EMG Control Logic
-    LaunchedEffect(lastGesture) {
-        if (gameState == GameState.PLAYING && lastGesture == "OPEN") {
-            birdVelocity = -9.5f // Trigger jump from flex
+    fun flap() {
+        when (state) {
+            GameState.START, GameState.GAME_OVER -> start()
+            GameState.PLAYING -> velocity = JUMP
         }
     }
 
-    // Physics Constants - Tuned to be slower and use more screen
-    val gravity = 0.34f      // 75% of previous 0.45f
-    val jumpImpulse = -9.5f  // Adjusted to match lighter gravity
-    val pipeSpeed = 3.5f
-
-    LaunchedEffect(username) {
-        viewModel.setUsername(username)
+    // Opening the hand flaps, same as a tap
+    LaunchedEffect(gesture) {
+        if (state == GameState.PLAYING && gesture == "OPEN") velocity = JUMP
     }
 
-    fun resetGame() {
-        birdY = screenHeight / 3f
-        birdVelocity = 0f
-        pipes = emptyList()
-        score = 0
-        gameState = GameState.PLAYING
-    }
+    LaunchedEffect(state) {
+        while (state == GameState.PLAYING) {
+            velocity += GRAVITY
+            birdY += velocity
 
-    // Game Loop
-    LaunchedEffect(gameState) {
-        if (gameState == GameState.PLAYING) {
-            while (gameState == GameState.PLAYING) {
-                birdVelocity += gravity
-                birdY += birdVelocity
-
-                // Update Pipes
-                pipes = pipes.map { it.copy(x = it.x - pipeSpeed) }
-                    .filter { it.x + it.width > 0 }
-
-                // Spawn Pipes - Dynamic based on screen width
-                if (pipes.isEmpty() || pipes.last().x < screenWidth * 0.5f) {
-                    pipes = pipes + Pipe(
-                        x = screenWidth,
-                        gapY = Random.nextFloat() * (screenHeight * 0.5f) + (screenHeight * 0.25f)
-                    )
-                }
-
-                // Scoring
-                pipes.forEach { pipe ->
-                    if (gameState == GameState.PLAYING && pipe.x < 200f && pipe.x + pipeSpeed >= 200f) {
-                        score++
-                    }
-                }
-
-                // Collision Detection - Uses full screen height
-                val birdRect = Offset(200f, birdY)
-                val birdSize = 30f
-
-                if (birdY < 0 || birdY > screenHeight) {
-                    gameState = GameState.GAME_OVER
-                }
-
-                pipes.forEach { pipe ->
-                    val hitPipeX = birdRect.x + birdSize > pipe.x && birdRect.x - birdSize < pipe.x + pipe.width
-                    val hitUpperPipe = birdRect.y - birdSize < pipe.gapY - pipe.gapHeight / 2
-                    val hitLowerPipe = birdRect.y + birdSize > pipe.gapY + pipe.gapHeight / 2
-                    
-                    if (hitPipeX && (hitUpperPipe || hitLowerPipe)) {
-                        gameState = GameState.GAME_OVER
-                    }
-                }
-
-                if (gameState == GameState.GAME_OVER) {
-                    viewModel.updateHighScore(score)
-                }
-
-                delay(16) // ~60 FPS
+            pipes = pipes.map { it.copy(x = it.x - PIPE_SPEED) }.filter { it.x + PIPE_WIDTH > 0 }
+            if (pipes.isEmpty() || pipes.last().x < width * 0.5f) {
+                pipes = pipes + Pipe(x = width, gapY = Random.nextFloat() * height * 0.5f + height * 0.25f)
             }
+            pipes = pipes.map {
+                if (!it.scored && it.x + PIPE_WIDTH < BIRD_X) { score++; it.copy(scored = true) } else it
+            }
+
+            val hit = birdY < 0 || birdY > height || pipes.any { p ->
+                val inX = BIRD_X + BIRD_RADIUS > p.x && BIRD_X - BIRD_RADIUS < p.x + PIPE_WIDTH
+                val inGap = birdY - BIRD_RADIUS > p.gapY - GAP_HEIGHT / 2 && birdY + BIRD_RADIUS < p.gapY + GAP_HEIGHT / 2
+                inX && !inGap
+            }
+            if (hit) {
+                state = GameState.GAME_OVER
+                viewModel.updateHighScore(score)
+            }
+            delay(16)
         }
     }
 
     Box(
-        modifier = Modifier
+        Modifier
             .fillMaxSize()
-            .background(Color(0xFF70C5CE))
-            .onSizeChanged { size ->
-                screenWidth = size.width.toFloat()
-                screenHeight = size.height.toFloat()
-                if (gameState == GameState.START) {
-                    birdY = screenHeight / 3f
-                }
+            .background(Sky)
+            .onSizeChanged {
+                width = it.width.toFloat()
+                height = it.height.toFloat()
+                if (state == GameState.START) birdY = height / 3f
             }
-            .clickable {
-                if (gameState == GameState.START) {
-                    gameState = GameState.PLAYING
-                } else if (gameState == GameState.PLAYING) {
-                    birdVelocity = jumpImpulse
-                } else if (gameState == GameState.GAME_OVER) {
-                    resetGame()
-                }
-            }
+            .pointerInput(Unit) { detectTapGestures { flap() } }
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            // Draw Pipes
-            pipes.forEach { pipe ->
-                // Upper pipe
-                drawRect(
-                    color = Color(0xFF74BF2E),
-                    topLeft = Offset(pipe.x, 0f),
-                    size = Size(pipe.width, pipe.gapY - pipe.gapHeight / 2)
-                )
-                // Lower pipe
-                drawRect(
-                    color = Color(0xFF74BF2E),
-                    topLeft = Offset(pipe.x, pipe.gapY + pipe.gapHeight / 2),
-                    size = Size(pipe.width, size.height - (pipe.gapY + pipe.gapHeight / 2))
-                )
+        Canvas(Modifier.fillMaxSize()) {
+            pipes.forEach { p ->
+                val top = p.gapY - GAP_HEIGHT / 2
+                val bottom = p.gapY + GAP_HEIGHT / 2
+                drawRoundRect(PipeColor, Offset(p.x, -40f), Size(PIPE_WIDTH, top + 40f), CornerRadius(18f))
+                drawRoundRect(PipeColor, Offset(p.x, bottom), Size(PIPE_WIDTH, size.height - bottom + 40f), CornerRadius(18f))
+                drawRoundRect(PipeEdge, Offset(p.x - 8f, top - 36f), Size(PIPE_WIDTH + 16f, 36f), CornerRadius(10f))
+                drawRoundRect(PipeEdge, Offset(p.x - 8f, bottom), Size(PIPE_WIDTH + 16f, 36f), CornerRadius(10f))
             }
-
-            // Draw Bird
-            drawCircle(
-                color = Color.Yellow,
-                radius = 30f,
-                center = Offset(200f, birdY)
-            )
+            drawCircle(Bird, BIRD_RADIUS, Offset(BIRD_X, birdY))
+            drawCircle(Color.Black, 5f, Offset(BIRD_X + 12f, birdY - 8f))
         }
 
-        // UI Overlays
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-                .padding(24.dp),
+            Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                FilledTonalIconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                Spacer(Modifier.weight(1f))
+                Text("Best $highScore", style = MaterialTheme.typography.labelLarge, color = Color(0xFF0C4A6E))
+            }
             Text(
-                text = "Score: $score",
-                fontSize = 32.sp,
+                "$score",
+                fontSize = 56.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
-            Text(
-                text = "High Score: $highScore",
-                fontSize = 18.sp,
-                color = Color.White
-            )
 
-            if (gameState == GameState.START) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "TAP TO START",
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    )
-                }
-            }
-
-            if (gameState == GameState.GAME_OVER) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text("GAME OVER", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text("Your Score: $score", color = Color.White.copy(alpha = 0.8f))
-                            Text("Best: $highScore", color = Color.White.copy(alpha = 0.8f))
-                            Spacer(modifier = Modifier.height(24.dp))
-                            Button(
-                                onClick = { resetGame() },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                            ) {
-                                Text("Try Again", color = MaterialTheme.colorScheme.onPrimary)
-                            }
-                            TextButton(onClick = onGameEnd) {
-                                Text("Back to Dashboard", color = Color.White.copy(alpha = 0.7f))
-                            }
-                        }
+            Spacer(Modifier.weight(1f))
+            when (state) {
+                GameState.START -> HintCard(
+                    title = "Tap or open your hand",
+                    message = "Each flap lifts the bird. Fly through the gaps."
+                )
+                GameState.GAME_OVER -> Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
+                    Column(Modifier.padding(24.dp).width(260.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Game over", style = MaterialTheme.typography.headlineSmall)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            if (score >= highScore && score > 0) "New best: $score" else "Score $score  ·  Best $highScore",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(20.dp))
+                        PrimaryButton("Play again", onClick = ::start)
+                        TextButton(onClick = onBack) { Text("Back to home") }
                     }
                 }
+                GameState.PLAYING -> {}
             }
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun HintCard(title: String, message: String) {
+    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)) {
+        Column(Modifier.padding(24.dp).width(260.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

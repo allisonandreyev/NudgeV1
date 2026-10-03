@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.nudge.app.data.*
 import com.nudge.app.utils.SecurityUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -16,40 +18,40 @@ class AuthViewModel @Inject constructor(
     private val dataPointDao: DataPointDao,
     private val userStatsDao: UserStatsDao,
     private val physicianConnectionDao: PhysicianConnectionDao,
-    private val therapySessionDao: TherapySessionDao
+    private val therapySessionDao: TherapySessionDao,
+    private val models: com.nudge.app.ai.ModelRepository
 ) : ViewModel() {
 
     private val _authState = MutableStateFlow<AuthResult?>(null)
     val authState = _authState.asStateFlow()
 
-    fun login(username: String, password: String, selectedRole: UserRole) {
+    fun login(username: String, password: String) {
         viewModelScope.launch {
             val user = userDao.getUserByUsername(username)
-            if (user == null) {
-                _authState.value = AuthResult.Error("User does not exist")
-            } else if (!SecurityUtils.checkPassword(password, user.passwordHash)) {
-                _authState.value = AuthResult.Error("Incorrect password")
-            } else if (user.role != selectedRole) {
-                _authState.value = AuthResult.Error("Incorrect role for this account")
+            // BCrypt is deliberately slow, keep it off the main thread
+            val ok = user != null && withContext(Dispatchers.Default) {
+                SecurityUtils.checkPassword(password, user.passwordHash)
+            }
+            _authState.value = if (user != null && ok) {
+                AuthResult.Success(user.username, user.role)
             } else {
-                _authState.value = AuthResult.Success(user.username, user.role)
+                AuthResult.Error("That username and password don't match.")
             }
         }
     }
 
     fun signUp(username: String, password: String, role: UserRole) {
         viewModelScope.launch {
-            val existingUser = userDao.getUserByUsername(username)
-            if (existingUser != null) {
-                _authState.value = AuthResult.Error("Username already taken")
-            } else {
-                try {
-                    val hashedPassword = SecurityUtils.hashPassword(password)
-                    userDao.registerUser(User(username, hashedPassword, role))
-                    _authState.value = AuthResult.SignUpSuccess(username)
-                } catch (e: Exception) {
-                    _authState.value = AuthResult.Error("Registration failed")
-                }
+            if (username.equals(com.nudge.app.DEMO_USERNAME, ignoreCase = true) || userDao.getUserByUsername(username) != null) {
+                _authState.value = AuthResult.Error("That username is taken.")
+                return@launch
+            }
+            try {
+                val hashed = withContext(Dispatchers.Default) { SecurityUtils.hashPassword(password) }
+                userDao.registerUser(User(username, hashed, role))
+                _authState.value = AuthResult.Success(username, role)
+            } catch (e: Exception) {
+                _authState.value = AuthResult.Error("Couldn't create the account. Try again.")
             }
         }
     }
@@ -57,16 +59,15 @@ class AuthViewModel @Inject constructor(
     fun deleteAccount(username: String) {
         viewModelScope.launch {
             try {
-                // Delete data from all tables associated with this user
                 dataPointDao.deleteDataForUser(username)
                 userStatsDao.deleteStatsForUser(username)
                 physicianConnectionDao.deleteAllConnectionsForUser(username)
                 therapySessionDao.deleteSessionsForUser(username)
                 userDao.deleteUser(username)
-                
+                models.delete(username)
                 _authState.value = AuthResult.Deleted
             } catch (e: Exception) {
-                _authState.value = AuthResult.Error("Failed to delete account")
+                _authState.value = AuthResult.Error("Couldn't delete the account.")
             }
         }
     }
@@ -78,7 +79,6 @@ class AuthViewModel @Inject constructor(
 
 sealed class AuthResult {
     data class Success(val username: String, val role: UserRole) : AuthResult()
-    data class SignUpSuccess(val username: String) : AuthResult()
     data class Error(val message: String) : AuthResult()
     object Deleted : AuthResult()
 }

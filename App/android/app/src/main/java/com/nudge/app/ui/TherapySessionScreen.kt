@@ -1,322 +1,278 @@
 package com.nudge.app.ui
 
-import androidx.compose.animation.*
-import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BackHand
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FrontHand
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.nudge.app.bluetooth.BluetoothViewModel
+import com.nudge.app.bluetooth.DeviceStatus
 import com.nudge.app.data.RestPosition
-import com.nudge.app.ui.theme.MedicalGradient
+import com.nudge.app.ui.components.*
+import com.nudge.app.ui.theme.NudgeTheme
 
 @Composable
 fun TherapySessionScreen(
     username: String,
-    onSessionEnd: () -> Unit,
-    therapyViewModel: TherapyViewModel = hiltViewModel(),
-    bluetoothViewModel: BluetoothViewModel
+    bluetooth: BluetoothViewModel,
+    onBack: () -> Unit,
+    onConnect: () -> Unit,
+    onCalibrate: () -> Unit,
+    viewModel: TherapyViewModel = hiltViewModel()
 ) {
-    val uiState by therapyViewModel.uiState.collectAsState()
-    val timerSeconds by therapyViewModel.timerSeconds.collectAsState()
-    val currentSessionId by therapyViewModel.currentSessionId.collectAsState()
-    
-    val emgDataD0 by bluetoothViewModel.emgDataD0.collectAsState()
-    val emgDataD1 by bluetoothViewModel.emgDataD1.collectAsState()
-    val emgDataD2 by bluetoothViewModel.emgDataD2.collectAsState()
-    
-    var selectedRestPosition by remember { mutableStateOf(RestPosition.OPENED) }
-    var isUploaded by remember { mutableStateOf(false) }
+    val saved by bluetooth.userModel.collectAsState()
+    // Suggest a quick check once per day of use, since the wearable is usually re-fitted daily
+    val needsCheck = saved?.let { !isToday(it.calibratedAt ?: it.trainedAt) } == true
+    val state by viewModel.uiState.collectAsState()
+    val sessionId by viewModel.currentSessionId.collectAsState()
+    val status by bluetooth.deviceStatus.collectAsState()
+    val online = status == DeviceStatus.Connected || status == DeviceStatus.Demo
+    val active = state == TherapyState.ACTIVE_REST || state == TherapyState.ACTIVE_CONTRACT
 
-    // Sync session ID with BluetoothViewModel for data tagging
-    LaunchedEffect(currentSessionId) {
-        bluetoothViewModel.setActiveSession(currentSessionId)
+    // Tag incoming readings with this session while it runs
+    LaunchedEffect(sessionId, state) {
+        bluetooth.setActiveSession(if (active) sessionId else null)
     }
-
-    // Enable AI Actuation during active session
-    if (uiState == TherapyState.ACTIVE_REST || uiState == TherapyState.ACTIVE_CONTRACT) {
-        DisposableEffect(Unit) {
-            bluetoothViewModel.sendCommand("ai_start")
-            onDispose {
-                bluetoothViewModel.sendCommand("ai_stop")
-            }
+    // AI assists the hand only while the session is running
+    LaunchedEffect(active) {
+        bluetooth.sendCommand(if (active) "ai_start" else "ai_stop")
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            bluetooth.setActiveSession(null)
+            bluetooth.sendCommand("ai_stop")
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(brush = MedicalGradient)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Guided Therapy",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 32.dp),
-                color = Color.White
-            )
-
-            when (uiState) {
-                TherapyState.IDLE, TherapyState.SETUP -> {
-                    SetupView(
-                        selectedRestPosition = selectedRestPosition,
-                        onRestPositionChange = { selectedRestPosition = it },
-                        onStart = { therapyViewModel.startSession(username, selectedRestPosition) }
-                    )
-                }
-                TherapyState.ACTIVE_REST, TherapyState.ACTIVE_CONTRACT -> {
-                    ActiveSessionView(
-                        uiState = uiState,
-                        timerSeconds = timerSeconds,
-                        restPosition = selectedRestPosition,
-                        emgDataD0 = emgDataD0,
-                        emgDataD1 = emgDataD1,
-                        emgDataD2 = emgDataD2,
-                        onStop = { therapyViewModel.stopSession() }
-                    )
-                }
-                TherapyState.STOPPED -> {
-                    SummaryView(
-                        isUploaded = isUploaded,
-                        onUpload = {
-                            therapyViewModel.uploadSession()
-                            isUploaded = true
-                        },
-                        onFinish = {
-                            therapyViewModel.reset()
-                            onSessionEnd()
-                        }
-                    )
-                }
+    NudgeScreen(title = if (state == TherapyState.FINISHED) "" else "Therapy", onBack = onBack) { padding ->
+        Box(Modifier.padding(padding).fillMaxSize()) {
+            when (state) {
+                TherapyState.SETUP -> SetupView(
+                    online = online,
+                    needsCheck = needsCheck,
+                    onCalibrate = onCalibrate,
+                    onConnect = onConnect,
+                    onStart = { position, reps -> viewModel.startSession(username, position, reps) }
+                )
+                TherapyState.ACTIVE_REST, TherapyState.ACTIVE_CONTRACT -> ActiveView(viewModel, bluetooth)
+                TherapyState.FINISHED -> FinishedView(viewModel, onDone = onBack)
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ColumnScope.SetupView(
-    selectedRestPosition: RestPosition,
-    onRestPositionChange: (RestPosition) -> Unit,
-    onStart: () -> Unit
+private fun SetupView(
+    online: Boolean,
+    needsCheck: Boolean,
+    onCalibrate: () -> Unit,
+    onConnect: () -> Unit,
+    onStart: (RestPosition, Int) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("1. Select Resting Position", fontWeight = FontWeight.Bold, color = Color.White)
-            Text(
-                "Choose the position your hand naturally sits in due to injury or comfort.",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.6f)
-            )
-            
-            Row(
-                modifier = Modifier.padding(top = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = selectedRestPosition == RestPosition.OPENED,
-                    onClick = { onRestPositionChange(RestPosition.OPENED) },
-                    label = { Text("Opened Palm") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                        containerColor = Color.White.copy(alpha = 0.1f),
-                        labelColor = Color.White
-                    )
+    var position by remember { mutableStateOf(RestPosition.OPENED) }
+    var reps by remember { mutableIntStateOf(10) }
+
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            if (!online) {
+                NotConnectedBanner(onConnect)
+                Spacer(Modifier.height(20.dp))
+            } else if (needsCheck) {
+                ActionRow(
+                    icon = Icons.Default.Tune,
+                    title = "Quick check first",
+                    subtitle = "15 seconds to tune the AI to today's fit",
+                    onClick = onCalibrate
                 )
-                FilterChip(
-                    selected = selectedRestPosition == RestPosition.CLOSED,
-                    onClick = { onRestPositionChange(RestPosition.CLOSED) },
-                    label = { Text("Closed Fist") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                        containerColor = Color.White.copy(alpha = 0.1f),
-                        labelColor = Color.White
-                    )
-                )
+                Spacer(Modifier.height(20.dp))
             }
+            Text("How does your hand rest?", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Pick the position your hand naturally falls into. You'll practise moving away from it.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ChoiceCard(Icons.Default.BackHand, "Open", position == RestPosition.OPENED, Modifier.weight(1f)) {
+                    position = RestPosition.OPENED
+                }
+                ChoiceCard(Icons.Default.FrontHand, "Closed", position == RestPosition.CLOSED, Modifier.weight(1f)) {
+                    position = RestPosition.CLOSED
+                }
+            }
+
+            Spacer(Modifier.height(28.dp))
+            Text("Repetitions", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(12.dp))
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                val options = listOf(5, 10, 20)
+                options.forEachIndexed { i, n ->
+                    SegmentedButton(
+                        selected = reps == n,
+                        onClick = { reps = n },
+                        shape = SegmentedButtonDefaults.itemShape(i, options.size)
+                    ) { Text("$n") }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "About ${reps * 10 / 60} min ${reps * 10 % 60} s. Each rep is 5 s relaxed, then 5 s moving.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        PrimaryButton("Start", icon = Icons.Default.PlayArrow, enabled = online, onClick = { onStart(position, reps) })
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChoiceCard(icon: ImageVector, label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val border = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(if (selected) 2.dp else 1.dp, border)
+    ) {
+        Column(Modifier.padding(vertical = 24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, null, modifier = Modifier.size(36.dp), tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            Text(label, style = MaterialTheme.typography.titleMedium)
         }
     }
+}
 
-    Spacer(modifier = Modifier.height(32.dp))
-
-    Text(
-        text = "When you start, follow the instructions to move your hand every 5 seconds.",
-        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        style = MaterialTheme.typography.bodyMedium,
-        color = Color.White.copy(alpha = 0.8f)
+@Composable
+private fun ActiveView(viewModel: TherapyViewModel, bluetooth: BluetoothViewModel) {
+    val state by viewModel.uiState.collectAsState()
+    val remaining by viewModel.phaseRemaining.collectAsState()
+    val rep by viewModel.rep.collectAsState()
+    val total by viewModel.totalReps.collectAsState()
+    val channels by bluetooth.channels.collectAsState()
+    val restPosition by viewModel.restPosition.collectAsState()
+    val moving = state == TherapyState.ACTIVE_CONTRACT
+    val ringColor by animateColorAsState(
+        if (moving) MaterialTheme.colorScheme.primary else NudgeTheme.colors.gestureRest,
+        label = "ring"
     )
 
-    Spacer(modifier = Modifier.weight(1f))
-
-    Button(
-        onClick = onStart,
-        modifier = Modifier.fillMaxWidth().height(56.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-    ) {
-        Icon(Icons.Default.PlayArrow, contentDescription = null)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text("Start Training", fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-fun ColumnScope.ActiveSessionView(
-    uiState: TherapyState,
-    timerSeconds: Int,
-    restPosition: RestPosition,
-    emgDataD0: List<Float>,
-    emgDataD1: List<Float>,
-    emgDataD2: List<Float>,
-    onStop: () -> Unit
-) {
-    val isResting = uiState == TherapyState.ACTIVE_REST
-    val instruction = if (isResting) "REST" else "CONTRACT"
-    val action = if (isResting) {
-        if (restPosition == RestPosition.OPENED) "Keep hand OPEN" else "Keep hand CLOSED"
-    } else {
-        if (restPosition == RestPosition.OPENED) "CLOSE your fist" else "OPEN your palm"
-    }
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth().weight(1f)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Box(
-                modifier = Modifier.size(100.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    progress = timerSeconds / 5f,
-                    modifier = Modifier.fillMaxSize(),
-                    strokeWidth = 6.dp,
-                    color = if (isResting) MaterialTheme.colorScheme.primary else Color(0xFF00E676)
-                )
-                Text(
-                    text = timerSeconds.toString(),
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White
-                )
-            }
-
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = instruction,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isResting) MaterialTheme.colorScheme.primary else Color(0xFF00E676)
-                )
-                Text(
-                    text = action,
-                    fontSize = 16.sp,
-                    color = Color.White.copy(alpha = 0.6f)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Live EMG Graphs
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            SensorGraphCard(label = "Sensor D0", data = emgDataD0, color = MaterialTheme.colorScheme.primary)
-            SensorGraphCard(label = "Sensor D1", data = emgDataD1, color = Color(0xFF00E676))
-            SensorGraphCard(label = "Sensor D2", data = emgDataD2, color = Color(0xFFFF9100))
-        }
-    }
-
-    Button(
-        onClick = onStop,
-        modifier = Modifier.fillMaxWidth().height(56.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.2f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f))
-    ) {
-        Icon(Icons.Default.Pause, contentDescription = null, tint = Color.White)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text("Stop Session", color = Color.White)
-    }
-}
-
-@Composable
-fun ColumnScope.SummaryView(
-    isUploaded: Boolean,
-    onUpload: () -> Unit,
-    onFinish: () -> Unit
-) {
-    Icon(
-        imageVector = Icons.Default.FrontHand,
-        contentDescription = null,
-        modifier = Modifier.size(120.dp),
-        tint = Color.White
-    )
-    
-    Spacer(modifier = Modifier.height(24.dp))
-    
-    Text("Session Complete!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-    Text("Your EMG data has been saved locally.", color = Color.White.copy(alpha = 0.6f))
-
-    Spacer(modifier = Modifier.weight(1f))
-
-    if (!isUploaded) {
-        Button(
-            onClick = onUpload,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Black,
-                contentColor = Color.White
-            ),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
-        ) {
-            Text("Save for Physician", fontWeight = FontWeight.Bold)
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-    } else {
-        Text(
-            "✓ Saved for Physician",
-            color = Color(0xFF00E676),
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        ProgressCaption(
+            progress = (rep - 1 + if (moving) 0.5f else 0f) / total,
+            caption = "Rep $rep of $total"
         )
-    }
+        Spacer(Modifier.weight(1f))
 
-    OutlinedButton(
-        onClick = onFinish,
-        modifier = Modifier.fillMaxWidth().height(56.dp),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
-    ) {
-        Text("Back to Dashboard")
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(240.dp)) {
+            CircularProgressIndicator(
+                progress = { remaining },
+                modifier = Modifier.fillMaxSize(),
+                strokeWidth = 10.dp,
+                color = ringColor,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                strokeCap = StrokeCap.Round
+            )
+            AnimatedContent(moving, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "instruction") { isMoving ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        if (isMoving) "Move" else "Relax",
+                        style = MaterialTheme.typography.displaySmall,
+                        color = if (isMoving) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        "${(remaining * TherapyViewModel.PHASE_MS / 1000f).toInt() + 1} s",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            when {
+                !moving -> "Let your hand rest"
+                restPosition == RestPosition.OPENED -> "Close your fist"
+                else -> "Open your hand"
+            },
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(Modifier.weight(1f))
+        NudgeCard(Modifier.fillMaxWidth().height(120.dp)) {
+            EmgChart(channels, Modifier.fillMaxSize(), showLegend = false)
+        }
+        Spacer(Modifier.height(16.dp))
+        SecondaryButton("End session", onClick = { viewModel.stopSession() })
+        Spacer(Modifier.height(16.dp))
     }
+}
+
+@Composable
+private fun FinishedView(viewModel: TherapyViewModel, onDone: () -> Unit) {
+    val rep by viewModel.rep.collectAsState()
+    val seconds by viewModel.durationSeconds.collectAsState()
+    val shared by viewModel.shared.collectAsState()
+
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(Modifier.weight(1f))
+        Icon(Icons.Default.CheckCircle, null, tint = NudgeTheme.colors.success, modifier = Modifier.size(72.dp))
+        Spacer(Modifier.height(16.dp))
+        Text("Nice work", style = MaterialTheme.typography.headlineMedium)
+        Text("Session saved on this phone.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(28.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatTile("$rep", "Reps", Modifier.weight(1f))
+            StatTile("${seconds / 60}:${"%02d".format(seconds % 60)}", "Duration", Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(12.dp))
+        NudgeCard(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Share with care team", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Your clinician can review this session.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = shared, onCheckedChange = viewModel::setShared)
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        PrimaryButton("Done", onClick = onDone)
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+private fun isToday(time: Long): Boolean {
+    val then = java.util.Calendar.getInstance().apply { timeInMillis = time }
+    val now = java.util.Calendar.getInstance()
+    return then.get(java.util.Calendar.YEAR) == now.get(java.util.Calendar.YEAR) &&
+        then.get(java.util.Calendar.DAY_OF_YEAR) == now.get(java.util.Calendar.DAY_OF_YEAR)
 }

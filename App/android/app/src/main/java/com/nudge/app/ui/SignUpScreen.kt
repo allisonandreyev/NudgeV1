@@ -1,224 +1,116 @@
 package com.nudge.app.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.nudge.app.data.UserRole
-import com.nudge.app.ui.theme.MedicalGradient
-import com.nudge.app.ui.theme.NudgeTheme
+import com.nudge.app.ui.components.ErrorText
+import com.nudge.app.ui.components.NudgeScreen
+import com.nudge.app.ui.components.NudgeTextField
+import com.nudge.app.ui.components.PrimaryButton
+import com.nudge.app.ui.components.SectionLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignUpScreen(
-    onSignUpSuccess: (String) -> Unit,
+    onBack: () -> Unit,
+    onSignedUp: (String, UserRole) -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var selectedRole by remember { mutableStateOf(UserRole.PATIENT) }
-
+    var role by remember { mutableStateOf(UserRole.PATIENT) }
+    var error by remember { mutableStateOf<String?>(null) }
     val authState by viewModel.authState.collectAsState()
 
     LaunchedEffect(authState) {
         when (val result = authState) {
-            is AuthResult.SignUpSuccess -> {
-                onSignUpSuccess(result.username)
-                viewModel.resetAuthState()
-            }
-            is AuthResult.Error -> {
-                errorMessage = result.message
-                viewModel.resetAuthState()
-            }
+            is AuthResult.Success -> onSignedUp(result.username, result.role)
+            is AuthResult.Error -> error = result.message
             else -> {}
         }
+        if (authState != null) viewModel.resetAuthState()
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(brush = MedicalGradient)
-    ) {
+    fun submit() {
+        error = when {
+            username.isBlank() || password.isBlank() -> "Choose a username and password."
+            password.length < 6 -> "Use at least 6 characters for your password."
+            password != confirmPassword -> "Passwords don't match."
+            else -> null
+        }
+        if (error == null) viewModel.signUp(username.trim(), password, role)
+    }
+
+    NudgeScreen(title = "", onBack = onBack) { padding ->
         Column(
             modifier = Modifier
+                .padding(padding)
                 .fillMaxSize()
-                .safeDrawingPadding()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 24.dp)
         ) {
+            Text("Create your account", style = MaterialTheme.typography.headlineMedium)
+            Spacer(Modifier.height(4.dp))
             Text(
-                text = if (selectedRole == UserRole.PHYSICIAN) "Register Professional" else "Register User",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier.padding(bottom = 32.dp),
-                textAlign = TextAlign.Center
+                "Your data stays encrypted on this phone.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Spacer(Modifier.height(28.dp))
 
-            // Role Selector
-            SingleChoiceSegmentedButtonRow(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                SegmentedButton(
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    onClick = { selectedRole = UserRole.PATIENT },
-                    selected = selectedRole == UserRole.PATIENT,
-                    colors = SegmentedButtonDefaults.colors(
-                        activeContainerColor = MaterialTheme.colorScheme.primary,
-                        activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                        inactiveContainerColor = Color.White.copy(alpha = 0.05f),
-                        inactiveContentColor = Color.White
-                    )
-                ) {
-                    Text("Patient")
-                }
-                SegmentedButton(
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    onClick = { selectedRole = UserRole.PHYSICIAN },
-                    selected = selectedRole == UserRole.PHYSICIAN,
-                    colors = SegmentedButtonDefaults.colors(
-                        activeContainerColor = MaterialTheme.colorScheme.primary,
-                        activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                        inactiveContainerColor = Color.White.copy(alpha = 0.05f),
-                        inactiveContentColor = Color.White
-                    )
-                ) {
-                    Text("Physician")
+            SectionLabel("I am a")
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                listOf(UserRole.PATIENT to "Patient", UserRole.PHYSICIAN to "Clinician").forEachIndexed { i, (value, label) ->
+                    SegmentedButton(
+                        selected = role == value,
+                        onClick = { role = value },
+                        shape = SegmentedButtonDefaults.itemShape(index = i, count = 2)
+                    ) { Text(label) }
                 }
             }
+            Spacer(Modifier.height(20.dp))
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            OutlinedTextField(
+            NudgeTextField(
                 value = username,
-                onValueChange = { 
-                    username = it
-                    errorMessage = null
-                },
-                label = { Text("Username") },
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedTextColor = Color.White,
-                    focusedTextColor = Color.White
-                )
+                onValueChange = { username = it; error = null },
+                label = "Username",
+                leadingIcon = Icons.Default.Person
             )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
+            Spacer(Modifier.height(12.dp))
+            NudgeTextField(
                 value = password,
-                onValueChange = { 
-                    password = it
-                    errorMessage = null
-                },
-                label = { Text("Password") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedTextColor = Color.White,
-                    focusedTextColor = Color.White
-                )
+                onValueChange = { password = it; error = null },
+                label = "Password",
+                leadingIcon = Icons.Default.Lock,
+                isPassword = true
             )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
+            Spacer(Modifier.height(12.dp))
+            NudgeTextField(
                 value = confirmPassword,
-                onValueChange = { 
-                    confirmPassword = it
-                    errorMessage = null
-                },
-                label = { Text("Confirm Password") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedTextColor = Color.White,
-                    focusedTextColor = Color.White
-                )
+                onValueChange = { confirmPassword = it; error = null },
+                label = "Confirm password",
+                leadingIcon = Icons.Default.Lock,
+                isPassword = true,
+                imeAction = ImeAction.Done,
+                onImeAction = ::submit
             )
+            ErrorText(error)
 
-            if (errorMessage != null) {
-                Text(
-                    text = errorMessage!!,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 8.dp).align(Alignment.Start)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Button(
-                onClick = {
-                    if (username.isBlank() || password.isBlank() || confirmPassword.isBlank()) {
-                        errorMessage = "Please fill all fields"
-                    } else if (password != confirmPassword) {
-                        errorMessage = "Passwords do not match"
-                    } else {
-                        viewModel.signUp(username, password, selectedRole)
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            ) {
-                Text("Sign Up", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            }
+            Spacer(Modifier.height(28.dp))
+            PrimaryButton("Create account", onClick = ::submit)
+            Spacer(Modifier.height(24.dp))
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun SignUpScreenPreview() {
-    NudgeTheme {
-        SignUpScreen(onSignUpSuccess = { _ -> })
     }
 }
