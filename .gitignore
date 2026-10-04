@@ -15,3 +15,5 @@ __pycache__/
 local.properties
 .idea/
 *.iml
+.pytest_cache/
+.fixture-*.txt

@@ -7,7 +7,7 @@ This directory centralizes the codebase for the Nudge ecosystem, including devic
 - XIAO_C6_Firmware: The primary Arduino firmware for the XIAO ESP32-C6 wearable. It streams the three EMG sensors (50Hz), runs the gesture model trained in the app, and controls the servos, all over a custom Binary TLV BLE protocol.
 - NudgeController: Alternative development environment for PlatformIO/VS Code users.
 - ServoController: Modular logic for high-precision servo movement and PCA9685 integration.
-- MacController: Python tool that connects to the wearable from a Mac (live plot, gesture readout, servo buttons). Run with `uv run nudge_mac.py`, or `--simulate` without hardware.
+- MacController: Python tool that connects to the wearable from a Mac: live plot, gesture readout, servo buttons, and the same Train AI and Quick check as the app (no Android phone needed). Run with `uv run nudge_mac.py`, or `--simulate` without hardware. Tests: `uv run --with numpy --with pytest pytest -q`.
 
 ## Firmware Requirements
 
