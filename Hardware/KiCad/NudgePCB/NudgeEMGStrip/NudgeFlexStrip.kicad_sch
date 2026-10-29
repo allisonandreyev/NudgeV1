@@ -5407,85 +5407,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:C")
-		(at 40.64 146.05 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "654faa40-7203-4b55-98fd-2461e919962d")
-		(property "Reference" "C7"
-			(at 40.64 138.43 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" ".1uF"
-			(at 40.386 148.844 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
-			(at 44.45 145.0848 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 40.64 146.05 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Unpolarized capacitor"
-			(at 40.64 146.05 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "4a6a5df7-93b3-4065-a00f-47e1ca331c40")
-		)
-		(pin "1"
-			(uuid "d1f58223-f317-4c24-bb69-65fc3bedbfa5")
-		)
-		(instances
-			(project "NudgeFlexStrip"
-				(path "/4e1ae81a-3816-4b95-8645-dc2f32948656"
-					(reference "C7")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:GND")
 		(at 44.45 156.21 270)
 		(unit 1)
@@ -8127,7 +8048,74 @@
 			)
 		)
 	)
-	(sheet_instances
+	  (symbol (lib_id "Device:R") (at 40.64 146.05 90) (unit 1)
+    (body_style 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (in_pos_files yes) (dnp no)
+    (uuid "7f7d4434-bd89-4677-bafb-d42aaefc2e53")
+    (property "Reference" "R2"
+      (at 40.64 144.018 90)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+    )
+    (property "Value" "0"
+      (at 40.64 146.05 90)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+    )
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric"
+      (at 40.64 147.828 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+    )
+    (property "Datasheet" ""
+      (at 40.64 146.05 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+    )
+    (property "Description" "0 ohm jumper: puts C3 (1uF) directly on VCAP3 as the ADS1298 datasheet requires (was 0.1uF in series)"
+      (at 40.64 146.05 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+    )
+    (pin "1" (uuid "402afd8a-fed3-47d1-a3b9-0302b2ddc8cc"))
+    (pin "2" (uuid "a9136059-512a-4e0b-aaaa-2fa335b843c8"))
+    (instances
+      (project "NudgeFlexStrip"
+        (path "/4e1ae81a-3816-4b95-8645-dc2f32948656"
+          (reference "R2")
+          (unit 1)
+        )
+      )
+    )
+  )
+  (sheet_instances
 		(path "/"
 			(page "1")
 		)
