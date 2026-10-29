@@ -29,13 +29,11 @@ namespace Board
     // Force sensors to 3V3 with 10k pull-downs (R1/R2): more pressure, higher reading
 
     // --- EMG strip (ADS1298 header J3 on the strip) ---------------------------------------
-    // The main board has no connector for the strip yet: every edge pin is used.
+    // Default: the revised main board (Hardware/KiCad/NudgePCB/Nudge), where J2 "EMG_Strip"
+    //   replaces the MyoWare connector and is wired to D0 and the XIAO's four bottom pads.
+    //   No features are lost.
     //
-    // Default (needs a small board revision): replace the MyoWare connector J2
-    //   with a strip connector wired to D0 and the XIAO's four bottom pads, which the board's
-    //   footprint already has but leaves unconnected. No features are lost.
-    //
-    // Bench option (current board, no rework): borrows the force-sensor and encoder pins, so
+    // Bench option (boards built before the revision): borrows the force-sensor and encoder pins, so
     //   unplug both force sensors and encoders; grip limiting is off and motors run on timers.
     //
     // Uncomment to use the bench option:

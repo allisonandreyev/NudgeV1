@@ -5,8 +5,12 @@ This directory contains the physical design files and electrical specifications 
 ## Contents
 
 - CAD Models: 3D design files for the wearable chassis, electrode housings, and mechanical components.
-- Electrical Diagrams: an early EMG test schematic. The current PCBs are KiCad projects in
-  `Nudge Fall Internship.zip` (`NudgePCB/Nudge` main board, `NudgePCB/NudgeEMGStrip` EMG strip).
+- Electrical Diagrams: an early EMG test schematic.
+- `KiCad/NudgePCB`: the current designs, from `Nudge Fall Internship.zip`:
+  - `Nudge`: main board. J2 is now the 12-pin EMG strip header (was the MyoWare connector).
+    The PCB is an unrouted placement draft.
+  - `NudgeEMGStrip`: the 16-pad EMG strip. C7 replaced by a 0 Ω jumper (R2) so VCAP3 gets 1 µF.
+  The git history shows each change against the original files.
 
 ## Component Specifications
 

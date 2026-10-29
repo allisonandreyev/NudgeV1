@@ -1,15 +1,14 @@
 # Wiring: main board + 16-pad EMG strip
 
-Read from the KiCad projects in `Nudge Fall Internship.zip`: the main board
-(`NudgePCB/Nudge/Nudge.kicad_sch`, Oct 11) and the EMG strip
-(`NudgePCB/NudgeEMGStrip/NudgeFlexStrip.kicad_sch`, Oct 27), and checked against the
-ADS1298 datasheet (TI SBAS459K). All pins live in `BoardConfig.h`.
+The design files are in `Hardware/KiCad/NudgePCB` (copied from `Nudge Fall Internship.zip`):
+the main board (`Nudge/Nudge.kicad_sch`) and the EMG strip (`NudgeEMGStrip/NudgeFlexStrip.kicad_sch`).
+Checked against the ADS1298 datasheet (TI SBAS459K). All pins live in `BoardConfig.h`.
 
 ## Main board (XIAO ESP32-S3)
 
 | XIAO pin | Net | Use |
 |---|---|---|
-| D0 | /EMG (MyoWare connector J2) | **free now**: the strip replaces the MyoWare sensors |
+| D0 | /STRIP_DRDY | EMG strip data-ready (was the MyoWare input) |
 | D1 | /FSR_THUMB | thumb force sensor (J3), 10k pull-down |
 | D2 | /FSR_INDEX | index force sensor (J4), 10k pull-down |
 | D3 | /VBAT_SENSE | battery through 100k/100k divider |
@@ -18,21 +17,21 @@ ADS1298 datasheet (TI SBAS459K). All pins live in `BoardConfig.h`.
 | D7 | /M1_ENC_A | motor 1 encoder channel A (J5 pin 5), 10k pull-up |
 | D8, D9 | /M2_IN1, /M2_IN2 | motor 2 (DRV8833 BIN1/BIN2), output on J6 |
 | D10 | /M2_ENC_A | motor 2 encoder channel A (J6 pin 5), 10k pull-up |
-| bottom pads MTCK, MTDO, MTDI, MTMS (GPIO39–42) | unconnected | used for the strip in the board revision below |
+| bottom pads MTCK, MTDO, MTDI, MTMS (GPIO39–42) | /STRIP_SCLK, /STRIP_DIN, /STRIP_DOUT, /STRIP_CS | EMG strip SPI |
 
 Only encoder channel A is wired (J5/J6 pin 6 is unconnected), so the firmware counts pulses
 and takes direction from what it's driving. Motors run from the 9 V boost (U3).
 
 ## Connecting the strip
 
-The main board has no connector for the strip: every edge pin is in use. The strip needs
-5 signals from the XIAO (SCLK, DIN, DOUT, CS, DRDY); the rest of its header J3 is tied off.
+Every edge pin of the XIAO was already in use, so the main board's MyoWare connector J2 has
+been replaced (schematic and PCB) by a 12-pin header, **J2 "EMG_Strip"**, wired 1:1 to the
+strip's header J3. Its SPI lines go to the XIAO's four bottom pads, which were in the footprint
+but unconnected; on a soldered module these are solid board pads. Nothing else is lost.
+This is the firmware's default pin setup.
 
-### Recommended: small main-board revision (firmware default)
-
-Replace the MyoWare connector J2 with a strip connector routed to D0 and the XIAO's four
-bottom pads. They're already in the board's XIAO footprint, just unconnected. On a soldered
-module these are solid board pads, not fragile wires, and nothing else is lost.
+The main board PCB is still an unrouted placement draft (no outline or tracks yet), so J2
+needs placing and routing along with everything else.
 
 | Strip J3 pin | Signal | Main board |
 |---|---|---|
@@ -122,10 +121,11 @@ Other commands: `grasp`, `retract`, `motor <1|2> <percent closed>`, `stop`, `ai_
 
 ## Things in the schematics worth checking
 
-- **Strip VCAP3 capacitor looks wrong.** The datasheet says to connect 1 µF from VCAP3 to
-  AVSS. On the strip, VCAP3 goes through C7 (0.1 µF) and then C3 (1 µF) in series to ground,
-  which is only about 0.09 µF. Rework: short across C7 (or replace it with 0 Ω) so C3 sits
-  directly on VCAP3.
+- **Strip VCAP3 capacitor (fixed in the design files).** The datasheet says to connect 1 µF
+  from VCAP3 to AVSS. The strip had C7 (0.1 µF) and C3 (1 µF) in series, only about 0.09 µF.
+  In the repo's design C7 is now **R2, a 0 Ω jumper** in the same 0603 spot, so C3 sits
+  directly on VCAP3. Strips already made from the Oct 27 Gerbers need the same rework:
+  bridge C7's pads or swap it for a 0 Ω part.
 - **Strip test signal may not work.** TESTP_PACE_OUT1/2 are tied to 3V3, which is what the
   datasheet says to do with unused pins. But it also says the internal test signal is driven
   out on those pins, so `ads mode test` may give a distorted or flat result. Use steps 4–5
@@ -136,5 +136,8 @@ Other commands: `grasp`, `retract`, `motor <1|2> <percent closed>`, `stop`, `ai_
 - **Motor stall current.** The Adafruit DRV8833 breakout has no current limit set, and homing
   and `calibrate` find the end stops by stalling the motors briefly (at 40% power, for at
   most 0.3 s after movement stops). Check the motors and gearboxes tolerate this.
+- **DRV8833 footprint mismatch (main board, pre-existing).** The schematic symbol has pins
+  15 (VMOTOR+) and 16 (GND) that the `NudgeParts:Adafruit_DRV8833` footprint lacks, so the
+  PCB's parity check flags them. Make sure the breakout still gets ground through another pin.
 - **D6 (motor enable) is also the S3's boot-log serial pin,** so it may toggle during boot.
   The motor inputs are pulled low (R8–R11), so the motors only coast, but it's worth knowing.
