@@ -27,7 +27,7 @@ from matplotlib.widgets import Button
 
 import nudge_model as nm
 
-# UUIDs - must match XIAO_C6_Firmware.ino
+# UUIDs - must match Software/Nudge_Firmware/Nudge_Firmware.ino
 SERVICE_UUID = "000b1e53-d47a-cede-de57-000000008488"
 CHAR_TX_UUID = "00008488-d47a-cede-0000-466178454d47"  # device -> us (notify)
 CHAR_RX_UUID = "00008288-d47a-cede-0000-526563436d64"  # us -> device (write)
@@ -35,6 +35,7 @@ CHAR_RX_UUID = "00008288-d47a-cede-0000-526563436d64"  # us -> device (write)
 TYPE_FLOAT = 0x1130
 TYPE_INT16 = 0x1112
 TYPE_UINT16 = 0x1116
+TYPE_UINT8 = 0x1115
 HEADER_SIZE = 6
 
 GESTURES = {0: "CLOSE", 1: "OPEN", 2: "PINCH", 3: "REST"}
@@ -48,6 +49,12 @@ GESTURE_HINTS = {
 }
 
 HISTORY = 250  # samples on screen, 5 seconds at 50Hz
+CHANNEL_COLORS = ["#0d9488", "#6366f1", "#f59e0b", "#e11d48", "#0284c7", "#9333ea", "#65a30d", "#ea580c"]
+
+
+def channel_name(i, total):
+    """On the 8-channel strip, channel 1 is pads 16 (+) / 15 (-), down to channel 8 on pads 2 / 1."""
+    return f"Ch{i + 1} ({16 - 2 * i}/{15 - 2 * i})" if total == 8 else f"Sensor {i + 1}"
 SERVO_SPEED = 150
 
 TRAIN_ROUNDS = 5
@@ -60,9 +67,10 @@ UPLOAD_TIMEOUT_S = 6.0
 
 
 def parse_packet(data: bytes):
-    """Returns ([emg0, emg1, emg2], classification, model_id) from one TLV packet.
-    model_id is -1 if the firmware doesn't report one (older firmware)."""
-    emg, gesture, model_id = [], -1, -1
+    """Returns (emg channels, classification, model_id, battery %, (thumb, index) force) from one TLV packet.
+    model_id is -1 if the firmware doesn't report one (older firmware); battery and force are
+    None unless the main board sends them (after the model id)."""
+    emg, gesture, model_id, battery, forces = [], -1, -1, None, []
     offset = HEADER_SIZE
     while offset + 4 <= len(data):
         tlv_type, length = struct.unpack_from(">HH", data, offset)
@@ -74,19 +82,27 @@ def parse_packet(data: bytes):
         elif tlv_type == TYPE_INT16 and length == 2:
             gesture = struct.unpack_from("<h", data, offset)[0]
         elif tlv_type == TYPE_UINT16 and length == 2:
-            model_id = struct.unpack_from("<H", data, offset)[0]
+            value = struct.unpack_from("<H", data, offset)[0]
+            # The first uint16 is the model id; ones after the battery are force sensors
+            if battery is None and model_id == -1:
+                model_id = value
+            elif battery is not None:
+                forces.append(value)
+        elif tlv_type == TYPE_UINT8 and length == 1:
+            battery = data[offset]
         offset += length
-    return emg, gesture, model_id
+    return emg, gesture, model_id, battery, (tuple(forces[:2]) if len(forces) >= 2 else None)
 
 
-def build_packet(message_id: int, emg, gesture: int, model_id: int) -> bytes:
-    """Same layout the firmware sends. Only used by --simulate."""
-    packet = bytes([0x01, 0x00, message_id & 0xFF, 0x10, 0x00, 36])
-    for value in emg:
-        packet += struct.pack(">HH", TYPE_FLOAT, 4) + struct.pack("<f", value)
-    packet += struct.pack(">HH", TYPE_INT16, 2) + struct.pack("<h", gesture)
-    packet += struct.pack(">HH", TYPE_UINT16, 2) + struct.pack("<H", model_id)
-    return packet
+def build_packet(message_id: int, emg, gesture: int, model_id: int, battery=87, grip=(40, 30)) -> bytes:
+    """Same layout the main-board firmware sends. Only used by --simulate."""
+    body = b"".join(struct.pack(">HH", TYPE_FLOAT, 4) + struct.pack("<f", v) for v in emg)
+    body += struct.pack(">HH", TYPE_INT16, 2) + struct.pack("<h", gesture)
+    body += struct.pack(">HH", TYPE_UINT16, 2) + struct.pack("<H", model_id)
+    body += struct.pack(">HH", TYPE_UINT8, 1) + bytes([battery])
+    for f in grip:
+        body += struct.pack(">HH", TYPE_UINT16, 2) + struct.pack("<H", f)
+    return bytes([0x01, 0x00, message_id & 0xFF, 0x10, 0x00, len(body)]) + body
 
 
 class Controller:
@@ -99,7 +115,10 @@ class Controller:
         self.running = True
         self.status = "Starting..."
         self.gesture = "UNKNOWN"
-        self.channels = [deque([0.0] * HISTORY, maxlen=HISTORY) for _ in range(3)]
+        self.channels = [deque([0.0] * HISTORY, maxlen=HISTORY) for _ in range(nm.CHANNELS)]
+        self.device_channels = None  # channels the wearable sends: 8 for the strip, 3 for MyoWare
+        self.battery = None  # main board battery %
+        self.grip = None  # (thumb, index) force-sensor readings
         self.tasks = set()
 
         # Model on the wearable: None until it reports, -1 if its firmware can't hold one
@@ -123,9 +142,12 @@ class Controller:
     # --- Data in -------------------------------------------------------------
 
     def on_packet(self, _sender, data: bytearray):
-        emg, gesture, model_id = parse_packet(bytes(data))
-        if len(emg) != 3:
+        emg, gesture, model_id, self.battery, self.grip = parse_packet(bytes(data))
+        if not emg:
             return
+        if len(emg) != len(self.channels):
+            self.channels = [deque([0.0] * HISTORY, maxlen=HISTORY) for _ in emg]
+        self.device_channels = len(emg)
         for channel, value in zip(self.channels, emg):
             channel.append(value)
         self.gesture = GESTURES.get(gesture, "UNKNOWN")
@@ -169,11 +191,17 @@ class Controller:
             return "No model yet"
         if not self.connected:
             return "Saved; sent when the wearable connects"
+        if self.wrong_sensors():
+            return "Trained for different sensors. Press Train AI to retrain with this wearable."
         if self.device_model_id == self.saved.id:
             return "On your wearable"
         if self.device_model_id == -1:
             return "Wearable needs the new firmware for this"
         return self.sync_note or "Sending to wearable…"
+
+    def wrong_sensors(self):
+        """True if the saved model was trained on a different sensor setup than the connected wearable."""
+        return self.saved is not None and self.device_channels is not None and self.saved.model.channels != self.device_channels
 
     async def sync_loop(self):
         """Sends the saved model whenever the connected wearable has a different one."""
@@ -181,7 +209,7 @@ class Controller:
             await asyncio.sleep(0.5)
             s = self.saved
             dev = self.device_model_id
-            if s is None or not self.connected or dev is None or dev < 0 or dev == s.id:
+            if s is None or not self.connected or dev is None or dev < 0 or dev == s.id or self.wrong_sensors():
                 continue
             tries = self.upload_attempts.get(s.id, 0)
             if tries >= UPLOAD_ATTEMPTS:
@@ -265,8 +293,8 @@ class Controller:
         print(self.info)
 
     async def check_flow(self):
-        if self.saved is None or self.saved.reference is None:
-            self.info = "Train the AI first (or retrain once if it was trained before quick checks existed)."
+        if self.saved is None or self.saved.reference is None or self.wrong_sensors():
+            self.info = "Train the AI first. (Retrain if it was trained on different sensors or before quick checks existed.)"
             return
         recorded = {}
         for i, (g, seconds) in enumerate(CHECK_STEPS):
@@ -279,11 +307,12 @@ class Controller:
         except ValueError:
             self.info = "Not enough signal. Make sure the wearable stays connected for the whole check."
             return
-        sensors = "   ".join(
-            f"Sensor {c + 1}: " + ("about the same" if st == "normal" else
-                                   "barely responding, check skin contact" if st == "not responding" else
-                                   f"{st} ({result.strength[c] * 100:.0f}%), adjusted")
-            for c, st in enumerate(result.sensors))
+        # Only mention channels that changed; with 8 channels the full list is too long to read
+        changed = [
+            f"{channel_name(c, len(result.sensors))} " + ("barely responding, check skin contact" if st == "not responding"
+                                                          else f"{st} ({result.strength[c] * 100:.0f}%)")
+            for c, st in enumerate(result.sensors) if st != "normal"]
+        sensors = ("Adjusted: " + ", ".join(changed)) if changed else "All channels about the same as training day."
         if not result.all_recognised:
             missed = ", ".join(GESTURE_NAMES[g] for g, ok in result.recognised.items() if not ok)
             self.info = f"Not recognised: {missed}. A sensor may have moved; retrain (Train AI).\n{sensors}"
@@ -336,7 +365,9 @@ class Controller:
         while self.running:
             reading = self.simulator.next(self.prompted)
             gesture = self.wearable.classify(reading)
-            self.on_packet(None, bytearray(build_packet(message_id, reading, gesture, self.wearable.model_id)))
+            # Fingers press on something while the simulated hand is closed
+            grip = (2200, 1800) if self.prompted == "CLOSE" or gesture == 0 else (40, 30)
+            self.on_packet(None, bytearray(build_packet(message_id, reading, gesture, self.wearable.model_id, grip=grip)))
             message_id += 1
             await asyncio.sleep(0.02)
 
@@ -346,26 +377,38 @@ class Controller:
         plt.ion()
         fig = plt.figure(figsize=(11, 7.5))
         fig.canvas.manager.set_window_title("Nudge Mac Controller")
-        ax = fig.add_axes([0.06, 0.36, 0.9, 0.5])
+        ax = fig.add_axes([0.12, 0.36, 0.84, 0.5])
 
-        colors = ["#0d9488", "#6366f1", "#f59e0b"]
-        lines = [ax.plot(range(HISTORY), list(ch), color=colors[i], lw=1.6, label=f"Sensor {i + 1}")[0]
-                 for i, ch in enumerate(self.channels)]
-        ax.set_ylim(0, 4095)  # 12-bit ADC
-        ax.set_xlim(0, HISTORY - 1)
-        ax.set_xticks([])
-        ax.set_ylabel("Raw signal")
-        ax.legend(loc="upper left", frameon=False)
-        for side in ("top", "right"):
-            ax.spines[side].set_visible(False)
+        lines = []
+
+        def build_lanes(n):
+            """One lane per channel, channel 1 at the top, each scaled to its own range."""
+            ax.cla()
+            lines.clear()
+            for i in range(n):
+                lines.append(ax.plot(range(HISTORY), [n - 1 - i + 0.5] * HISTORY, color=CHANNEL_COLORS[i % len(CHANNEL_COLORS)], lw=1.3)[0])
+            ax.set_ylim(0, n)
+            ax.set_xlim(0, HISTORY - 1)
+            ax.set_xticks([])
+            ax.set_yticks([n - 1 - i + 0.5 for i in range(n)], [channel_name(i, n) for i in range(n)], fontsize=8)
+            for i in range(1, n):
+                ax.axhline(i, color="#e2e8f0", lw=0.8)
+            for side in ("top", "right"):
+                ax.spines[side].set_visible(False)
+
+        build_lanes(len(self.channels))
 
         status_text = fig.text(0.06, 0.95, "", fontsize=10)
         model_text = fig.text(0.06, 0.915, "", fontsize=10, color="#475569")
         gesture_text = fig.text(0.96, 0.92, "", fontsize=24, fontweight="bold", ha="right")
-        prompt_title = ax.text(0.5, 0.6, "", transform=ax.transAxes, ha="center", va="center", fontsize=30,
-                               fontweight="bold", bbox=dict(boxstyle="round,pad=0.6", fc="white", ec="#e2e8f0", alpha=0.92))
-        prompt_sub = ax.text(0.5, 0.36, "", transform=ax.transAxes, ha="center", va="center", fontsize=13, color="#475569",
-                             bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="none", alpha=0.85))
+        def make_prompts():
+            title = ax.text(0.5, 0.6, "", transform=ax.transAxes, ha="center", va="center", fontsize=30, zorder=10,
+                            fontweight="bold", bbox=dict(boxstyle="round,pad=0.6", fc="white", ec="#e2e8f0", alpha=0.92))
+            sub = ax.text(0.5, 0.36, "", transform=ax.transAxes, ha="center", va="center", fontsize=13, color="#475569",
+                          zorder=10, bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="none", alpha=0.85))
+            return title, sub
+
+        prompt_title, prompt_sub = make_prompts()
         info_text = fig.text(0.06, 0.29, "", fontsize=10.5, va="top", wrap=True)
 
         # Kept in a list so the widgets are not garbage collected
@@ -384,8 +427,8 @@ class Controller:
             ("AI off", cmd("ai_stop"), "0.93"),
             ("Close hand", cmd(f"grasp 255 {SERVO_SPEED}"), "0.93"),
             ("Open hand", cmd(f"retract 255 {SERVO_SPEED}"), "0.93"),
-            ("Engage", cmd("engage"), "0.93"),
-            ("Disengage", cmd("disengage"), "0.93"),
+            ("Calibrate motors", cmd("calibrate"), "0.93"),
+            ("Status", cmd("status"), "0.93"),
             ("STOP", cmd("stop"), "#fecaca"),
         ])
         add_row(0.03, [
@@ -398,9 +441,22 @@ class Controller:
         fig.show()
 
         while self.running:
-            for line, channel in zip(lines, self.channels):
-                line.set_ydata(list(channel))
-            status_text.set_text(self.status)
+            if len(lines) != len(self.channels):
+                # Wearable with a different channel count: redraw the lanes (this clears the axes)
+                build_lanes(len(self.channels))
+                prompt_title, prompt_sub = make_prompts()
+            n = len(self.channels)
+            for i, (line, channel) in enumerate(zip(lines, self.channels)):
+                values = list(channel)
+                lo, hi = min(values), max(values)
+                span = max(hi - lo, 5.0)  # microvolts; keeps a quiet channel from looking like noise
+                line.set_ydata([n - 1 - i + 0.1 + 0.8 * (v - lo) / span for v in values])
+            extras = []
+            if self.battery is not None:
+                extras.append(f"battery {self.battery}%")
+            if self.grip is not None:
+                extras.append(f"grip thumb {self.grip[0]} / index {self.grip[1]}")
+            status_text.set_text(self.status + ("   ·   " + "   ·   ".join(extras) if extras else ""))
             model_text.set_text((self.model_summary() + " · " if self.saved else "") + self.sync_state())
             gesture_text.set_text(GESTURE_NAMES.get(self.gesture, "—"))
             gesture_text.set_color(GESTURE_COLORS.get(self.gesture, "#94a3b8"))

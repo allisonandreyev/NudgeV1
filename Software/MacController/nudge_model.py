@@ -14,12 +14,20 @@ from pathlib import Path
 
 import numpy as np
 
-CHANNELS = 3
+CHANNELS = 8  # 16-pad ADS1298 strip; models work with any count (3 for the old MyoWare sensors)
 WINDOW = 10  # 200 ms at 50 Hz
-FEATURES = CHANNELS * 3
 # Order the firmware reports gestures in: 0/2 close the hand, 1/3 open it
 CLASSES = ["CLOSE", "OPEN", "PINCH", "REST"]
-PARAMETER_COUNT = CHANNELS * 2 + FEATURES * 2 + len(CLASSES) * (FEATURES + 1)
+
+
+def _core_count(channels):
+    f = channels * 3
+    return f * 2 + len(CLASSES) * (f + 1)
+
+
+def parameter_count(channels=CHANNELS):
+    """Values sent to the wearable: 64 for 3 channels, 164 for the 8-channel strip."""
+    return channels * 2 + _core_count(channels)
 SHRINKAGE = 0.1
 GOOD_ACCURACY = 0.7
 
@@ -52,8 +60,19 @@ class Model:
     scale: np.ndarray
     weights: np.ndarray  # classes x features
     bias: np.ndarray
-    gain: np.ndarray = field(default_factory=lambda: np.ones(CHANNELS, dtype=np.float32))
-    offset: np.ndarray = field(default_factory=lambda: np.zeros(CHANNELS, dtype=np.float32))
+    gain: np.ndarray = None
+    offset: np.ndarray = None
+
+    def __post_init__(self):
+        n = len(self.mean) // 3
+        if self.gain is None:
+            self.gain = np.ones(n, dtype=np.float32)
+        if self.offset is None:
+            self.offset = np.zeros(n, dtype=np.float32)
+
+    @property
+    def channels(self):
+        return len(self.gain)
 
     def adjust(self, reading) -> np.ndarray:
         return np.maximum(self.gain * np.asarray(reading, dtype=np.float32) + self.offset, 0)
@@ -78,15 +97,18 @@ class Model:
     @staticmethod
     def from_parameters(p) -> "Model":
         p = np.asarray(p, dtype=np.float32)
-        if len(p) == PARAMETER_COUNT - CHANNELS * 2:  # saved before recalibration existed
-            p = np.concatenate([np.ones(CHANNELS), np.zeros(CHANNELS), p]).astype(np.float32)
-        assert len(p) == PARAMETER_COUNT
-        b = CHANNELS * 2
-        n, k = FEATURES, len(CLASSES)
+        ch = next((c for c in range(1, 17) if parameter_count(c) == len(p)), None)
+        if ch is None:  # saved before recalibration existed: no gain/offset
+            ch = next((c for c in range(1, 17) if _core_count(c) == len(p)), None)
+            if ch is None:
+                raise ValueError(f"Unexpected parameter count {len(p)}")
+            p = np.concatenate([np.ones(ch), np.zeros(ch), p]).astype(np.float32)
+        b = ch * 2
+        n, k = ch * 3, len(CLASSES)
         return Model(
             mean=p[b:b + n], scale=p[b + n:b + 2 * n],
             weights=p[b + 2 * n:b + 2 * n + k * n].reshape(k, n), bias=p[-k:],
-            gain=p[:CHANNELS], offset=p[CHANNELS:b],
+            gain=p[:ch], offset=p[ch:b],
         )
 
 
@@ -108,7 +130,8 @@ def fit(recordings) -> Model:
     centres = np.array([x.mean(axis=0) for x in z])
     cov = sum((x - c).T @ (x - c) for x, c in zip(z, centres)) / max(len(allf) - len(CLASSES), 1)
     # Shrink toward a diagonal so short recordings still give a stable inverse
-    cov = (1 - SHRINKAGE) * cov + SHRINKAGE * np.trace(cov) / FEATURES * np.eye(FEATURES)
+    d = allf.shape[1]
+    cov = (1 - SHRINKAGE) * cov + SHRINKAGE * np.trace(cov) / d * np.eye(d)
     weights = centres @ np.linalg.inv(cov)
     bias = -0.5 * np.einsum("kd,kd->k", weights, centres) + math.log(1 / len(CLASSES))
     return Model(mean.astype(np.float32), scale.astype(np.float32), weights.astype(np.float32), bias.astype(np.float32))
@@ -124,9 +147,10 @@ class Reference:
 def reference(recordings) -> Reference:
     rest = [r for rec in recordings if rec.label == "REST" for r in rec.readings]
     active = [r for rec in recordings if rec.label in ("CLOSE", "OPEN") for r in rec.readings]
+    channels = len(recordings[0].readings[0])
     return Reference(
-        rest=np.array([percentile([x[c] for x in rest], 0.5) for c in range(CHANNELS)], dtype=np.float32),
-        active=np.array([percentile([x[c] for x in active], 0.9) for c in range(CHANNELS)], dtype=np.float32),
+        rest=np.array([percentile([x[c] for x in rest], 0.5) for c in range(channels)], dtype=np.float32),
+        active=np.array([percentile([x[c] for x in active], 0.9) for c in range(channels)], dtype=np.float32),
     )
 
 
@@ -184,8 +208,10 @@ def calibrate(base: Model, ref: Reference, rest, fist, open_) -> CalibrationResu
     if min(len(rest), len(fist), len(open_)) < WINDOW:
         raise ValueError("Not enough readings")
     active = list(fist) + list(open_)
+    if len(rest[0]) != base.channels:
+        raise ValueError(f"Readings have {len(rest[0])} channels, model has {base.channels}")
     gain, offset, states, strength = [], [], [], []
-    for c in range(CHANNELS):
+    for c in range(base.channels):
         today_rest = percentile([r[c] for r in rest], 0.5)
         today_active = percentile([r[c] for r in active], 0.9)
         ref_range = max(float(ref.active[c] - ref.rest[c]), 1.0)
@@ -275,7 +301,8 @@ def now_ms() -> int:
 class SimulatedWearable:
     """Acts like the firmware: installs uploaded models and classifies with them."""
 
-    def __init__(self):
+    def __init__(self, channels=CHANNELS):
+        self.channels = channels
         self.model_id = 0
         self.model = None
         self._staging = {}
@@ -294,8 +321,8 @@ class SimulatedWearable:
             for i, v in enumerate(parts[2:]):
                 self._staging[start + i] = float(v)
         elif parts[0] == "mdl_end":
-            if len(self._staging) == PARAMETER_COUNT and abs(sum(self._staging.values()) - float(parts[1])) <= 1e-3 * (1 + abs(float(parts[1]))):
-                self.model = Model.from_parameters([self._staging[i] for i in range(PARAMETER_COUNT)])
+            if len(self._staging) == parameter_count(self.channels) and abs(sum(self._staging.values()) - float(parts[1])) <= 1e-3 * (1 + abs(float(parts[1]))):
+                self.model = Model.from_parameters([self._staging[i] for i in range(parameter_count(self.channels))])
                 self.model_id = self._staging_id
         elif parts[0] == "mdl_clear":
             self.model, self.model_id = None, 0
@@ -316,20 +343,27 @@ class SimulatedWearable:
 
 
 class Simulator:
-    """Believable EMG envelopes per gesture; mirrors the app's DemoSimulator."""
-    PATTERNS = {"REST": (160, 140, 170), "OPEN": (850, 420, 1500), "CLOSE": (1650, 1250, 520), "PINCH": (700, 1550, 620)}
+    """Believable 8-channel strip envelopes (microvolts) per gesture; mirrors the app's DemoSimulator.
+    Channels 1-4 roughly over the flexors, 5-8 the extensors."""
+    PATTERNS = {
+        "REST": (4, 4, 5, 4, 4, 5, 4, 4),
+        "OPEN": (8, 10, 12, 9, 60, 110, 90, 40),
+        "CLOSE": (90, 120, 100, 60, 20, 30, 25, 15),
+        "PINCH": (30, 60, 25, 10, 10, 40, 70, 20),
+    }
     CYCLE = ["REST", "OPEN", "REST", "CLOSE", "REST", "PINCH"]
 
-    def __init__(self, rng=None, gain=(1, 1, 1), offset=(0, 0, 0)):
+    def __init__(self, rng=None, gain=(1,) * CHANNELS, offset=(0,) * CHANNELS):
         self.rng = rng or random.Random()
         self.gain, self.offset = gain, offset
-        self.levels = [150.0] * 3
+        self.levels = [4.0] * CHANNELS
         self.tick = 0
 
     @classmethod
     def random_placement(cls, rng=None):
         rng = rng or random.Random()
-        return cls(rng, tuple(0.6 + rng.random() * 0.9 for _ in range(3)), tuple(rng.random() * 120 - 40 for _ in range(3)))
+        return cls(rng, tuple(0.6 + rng.random() * 0.9 for _ in range(CHANNELS)),
+                   tuple(rng.random() * 4 - 1 for _ in range(CHANNELS)))
 
     def next(self, target=None):
         self.tick += 1
@@ -339,5 +373,5 @@ class Simulator:
             self.levels[i] += (p - self.levels[i]) * 0.15
             tremor = 1 + 0.08 * math.sin(self.tick * 0.6 + i * 2)
             noise = self.rng.random() * 0.2 + 0.9
-            out.append(min(max(self.gain[i] * self.levels[i] * tremor * noise + self.offset[i], 0), 4095))
+            out.append(max(self.gain[i] * self.levels[i] * tremor * noise + self.offset[i], 0))
         return out

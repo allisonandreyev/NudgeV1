@@ -14,15 +14,20 @@ import kotlin.math.sqrt
  * [Features] or [GestureModel.scores] must be mirrored in GestureModel.h.
  */
 object Features {
-    const val CHANNELS = 3
     const val WINDOW = 10 // 200 ms at 50 Hz
-    const val COUNT = CHANNELS * 3
 
-    /** [window] holds WINDOW readings, oldest first, each with CHANNELS values. */
+    /** Feature count for a wearable with [channels] sensors: level, spread and change for each. */
+    fun count(channels: Int) = channels * 3
+
+    /**
+     * [window] holds WINDOW readings, oldest first, one value per channel. Works for any
+     * channel count: 3 for the original MyoWare sensors, 8 for the 16-pad ADS1298 strip.
+     */
     fun extract(window: List<FloatArray>): FloatArray {
         require(window.size == WINDOW)
-        val out = FloatArray(COUNT)
-        for (c in 0 until CHANNELS) {
+        val channels = window[0].size
+        val out = FloatArray(count(channels))
+        for (c in 0 until channels) {
             var sum = 0.0
             for (s in window) sum += s[c]
             val mean = sum / WINDOW
@@ -35,8 +40,8 @@ object Features {
             }
             // log(1 + x) evens out the very different signal sizes between people and sensors
             out[c] = ln(1.0 + mean).toFloat()
-            out[CHANNELS + c] = ln(1.0 + sqrt(sq / WINDOW)).toFloat()
-            out[2 * CHANNELS + c] = ln(1.0 + wl / (WINDOW - 1)).toFloat()
+            out[channels + c] = ln(1.0 + sqrt(sq / WINDOW)).toFloat()
+            out[2 * channels + c] = ln(1.0 + wl / (WINDOW - 1)).toFloat()
         }
         return out
     }
@@ -60,9 +65,12 @@ class GestureModel(
      * Identity when trained; set by a quick recalibration so the model keeps working when
      * a sensor reads stronger or weaker than on training day.
      */
-    val gain: FloatArray = FloatArray(Features.CHANNELS) { 1f },
-    val offset: FloatArray = FloatArray(Features.CHANNELS)
+    val gain: FloatArray = FloatArray(mean.size / 3) { 1f },
+    val offset: FloatArray = FloatArray(mean.size / 3)
 ) {
+    /** Number of sensor channels this model was trained for. */
+    val channels: Int get() = gain.size
+
     /** Raw reading corrected for today's sensor placement. Never negative, like the raw signal. */
     fun adjust(raw: FloatArray): FloatArray = FloatArray(raw.size) { (gain[it] * raw[it] + offset[it]).coerceAtLeast(0f) }
 
@@ -97,17 +105,22 @@ class GestureModel(
     companion object {
         /** Gesture order used by the firmware's actuation logic: 0/2 close the hand, 1/3 open it. */
         val FIRMWARE_CLASSES = listOf("CLOSE", "OPEN", "PINCH", "REST")
-        private val CORE_COUNT = Features.COUNT * 2 + FIRMWARE_CLASSES.size * (Features.COUNT + 1)
-        val PARAMETER_COUNT = Features.CHANNELS * 2 + CORE_COUNT
+        private fun coreCount(channels: Int, classes: Int) = Features.count(channels) * 2 + classes * (Features.count(channels) + 1)
+
+        /** Parameters sent to the wearable: 64 for 3 channels, 164 for the 8-channel strip. */
+        fun parameterCount(channels: Int, classes: Int = FIRMWARE_CLASSES.size) = channels * 2 + coreCount(channels, classes)
 
         fun fromParameters(params: FloatArray, classes: List<String> = FIRMWARE_CLASSES): GestureModel {
-            val ch = Features.CHANNELS
-            val n = Features.COUNT
-            // Models saved before recalibration existed have no gain/offset; treat them as uncorrected
-            val p = if (params.size == CORE_COUNT) FloatArray(ch) { 1f } + FloatArray(ch) + params else params
-            require(p.size == ch * 2 + n * 2 + classes.size * (n + 1))
+            val k = classes.size
+            // Work out the channel count from the size; models saved before recalibration
+            // existed have no gain/offset, so treat them as uncorrected
+            val withGain = (1..16).firstOrNull { parameterCount(it, k) == params.size }
+            val legacy = (1..16).firstOrNull { coreCount(it, k) == params.size }
+            val ch = withGain ?: legacy ?: throw IllegalArgumentException("Unexpected parameter count ${params.size}")
+            val n = Features.count(ch)
+            val p = if (withGain == null) FloatArray(ch) { 1f } + FloatArray(ch) + params else params
             val base = ch * 2
-            val weights = Array(classes.size) { k -> p.copyOfRange(base + 2 * n + k * n, base + 2 * n + (k + 1) * n) }
+            val weights = Array(k) { c -> p.copyOfRange(base + 2 * n + c * n, base + 2 * n + (c + 1) * n) }
             return GestureModel(
                 classes,
                 mean = p.copyOfRange(base, base + n),
@@ -173,9 +186,10 @@ object GestureTrainer {
     fun reference(recordings: List<Recording>): ChannelReference {
         val rest = recordings.filter { it.label == "REST" }.flatMap { it.readings }
         val active = recordings.filter { it.label == "CLOSE" || it.label == "OPEN" }.flatMap { it.readings }
+        val channels = recordings.first().readings.first().size
         return ChannelReference(
-            rest = FloatArray(Features.CHANNELS) { c -> percentile(rest.map { it[c] }, 0.5f) },
-            active = FloatArray(Features.CHANNELS) { c -> percentile(active.map { it[c] }, 0.9f) }
+            rest = FloatArray(channels) { c -> percentile(rest.map { it[c] }, 0.5f) },
+            active = FloatArray(channels) { c -> percentile(active.map { it[c] }, 0.9f) }
         )
     }
 
@@ -186,9 +200,9 @@ object GestureTrainer {
     }
 
     fun fit(recordings: List<Recording>, classes: List<String>): GestureModel {
-        val d = Features.COUNT
         val byClass = classes.map { c -> recordings.filter { it.label == c }.flatMap { Features.slide(it.readings) } }
         require(byClass.all { it.size >= 2 }) { "Every gesture needs recorded data" }
+        val d = byClass[0][0].size
         val all = byClass.flatten()
 
         // Standardise each feature so no single sensor dominates

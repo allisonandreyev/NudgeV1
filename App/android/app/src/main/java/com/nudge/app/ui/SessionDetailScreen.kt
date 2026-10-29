@@ -36,7 +36,8 @@ fun SessionDetailScreen(
 
     // One line per sensor, thinned out so long sessions still draw quickly
     val channels = remember(points) {
-        List(3) { sensor ->
+        val sensors = (points.maxOfOrNull { it.sensorId } ?: -1) + 1
+        List(sensors) { sensor ->
             val values = points.filter { it.sensorId == sensor }.map { it.value }
             val step = (values.size / 300).coerceAtLeast(1)
             values.filterIndexed { i, _ -> i % step == 0 }

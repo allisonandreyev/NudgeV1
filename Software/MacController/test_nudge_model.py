@@ -56,11 +56,12 @@ def test_matches_the_app_and_firmware():
             device.command(rest)
         elif kind == "READ":
             parts = rest.split()
-            window = (window + [[float(v) for v in parts[:3]]])[-nm.WINDOW:]
-            if "EXPECT" in parts:
+            n = parts.index("EXPECT") if "EXPECT" in parts else len(parts)
+            window = (window + [[float(v) for v in parts[:n]]])[-nm.WINDOW:]
+            if n < len(parts):
                 k, p = device.model.predict_window(window)
-                assert k == int(parts[4])
-                assert p == pytest.approx(float(parts[5]), abs=1e-3)
+                assert k == int(parts[n + 1])
+                assert p == pytest.approx(float(parts[n + 2]), abs=1e-3)
                 checked += 1
     assert device.model_id == 777
     assert checked > 100
@@ -69,6 +70,12 @@ def test_matches_the_app_and_firmware():
 def test_learns_distinct_gestures(trained):
     assert trained.accuracy > 0.95
     assert set(trained.per_gesture) == set(GESTURES)
+
+
+def test_channel_counts():
+    assert nm.parameter_count(8) == 164 and nm.parameter_count(3) == 64
+    assert nm.Model.from_parameters(np.ones(164)).channels == 8
+    assert nm.Model.from_parameters(np.ones(58)).channels == 3  # 3-sensor model from before recalibration
 
 
 def test_upload_installs_the_same_model(trained):
@@ -81,8 +88,9 @@ def test_upload_installs_the_same_model(trained):
 
 
 def test_quick_check_recovers_from_moved_sensors(trained):
+    # Strip re-fitted badly: flexor side ~30%, extensor side ~240% (same as the app's test)
     def shifted(seed):
-        return nm.Simulator(random.Random(seed), (0.45, 1.6, 0.8), (60, -20, 90))
+        return nm.Simulator(random.Random(seed), (0.3, 0.3, 0.35, 0.3, 2.5, 2.2, 2.6, 2.4), (3, -1, 4, 2, 0, 3, -1, 2))
 
     def check(sim):
         for _ in range(50): sim.next("REST")
@@ -99,7 +107,7 @@ def test_quick_check_recovers_from_moved_sensors(trained):
     assert before < 0.8
     assert after > 0.9
     assert result.all_recognised
-    assert result.sensors[0] == "weaker" and result.sensors[1] == "stronger"
+    assert result.sensors[0] == "weaker" and result.sensors[4] == "stronger"
 
 
 def test_save_and_load_round_trip(tmp_path, trained):
@@ -113,16 +121,26 @@ def test_save_and_load_round_trip(tmp_path, trained):
 
 
 def test_writes_fixture_for_firmware_check(trained):
-    """Python-made upload + predictions, for Software/XIAO_C6_Firmware/test/model_test."""
-    model = trained.model.with_calibration([0.9, 1.2, 1.05], [5, -10, 15])
+    """Python-made upload + predictions, for Software/Nudge_Firmware/test/model_test."""
+    model = trained.model.with_calibration([0.9, 1.2, 1.05, 0.8, 1.1, 1.3, 0.95, 1.0], [0.5, -1, 1.5, 0, 0.2, -0.5, 1, 0])
     sim = nm.Simulator(random.Random(7))
     readings = [sim.next(g) for g in ["REST", "OPEN", "CLOSE", "PINCH"] for _ in range(40)]
     lines = [f"CMD {c}" for c in nm.upload_commands(model, 777)]
     for i, r in enumerate(readings):
-        line = f"READ {r[0]} {r[1]} {r[2]}"
+        line = "READ " + " ".join(str(v) for v in r)
         if i >= nm.WINDOW - 1:
             k, p = model.predict_window(readings[i - nm.WINDOW + 1:i + 1])
             line += f" EXPECT {k} {p}"
         lines.append(line)
     out = Path(__file__).parent / ".fixture-python.txt"
     out.write_text("\n".join(lines) + "\n")
+
+
+def test_main_board_packet_round_trip():
+    """Packet layout must match Nudge_Firmware.ino: 8 floats, gesture, model id, battery, two forces."""
+    import nudge_mac
+    emg = [float(i) for i in range(8)]
+    packet = nudge_mac.build_packet(5, emg, 2, 4242, battery=63, grip=(1000, 2600))
+    got_emg, gesture, model_id, battery, grip = nudge_mac.parse_packet(packet)
+    assert got_emg == emg and gesture == 2 and model_id == 4242
+    assert battery == 63 and grip == (1000, 2600)

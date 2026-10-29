@@ -40,12 +40,14 @@ object Calibration {
             "Not enough readings"
         }
         val active = fist + open
-        val gain = FloatArray(Features.CHANNELS)
-        val offset = FloatArray(Features.CHANNELS)
+        val channels = base.channels
+        require(rest[0].size == channels) { "Readings have ${rest[0].size} channels, model has $channels" }
+        val gain = FloatArray(channels)
+        val offset = FloatArray(channels)
         val states = mutableListOf<SensorState>()
-        val strength = FloatArray(Features.CHANNELS)
+        val strength = FloatArray(channels)
 
-        for (c in 0 until Features.CHANNELS) {
+        for (c in 0 until channels) {
             val todayRest = GestureTrainer.percentile(rest.map { it[c] }, 0.5f)
             val todayActive = GestureTrainer.percentile(active.map { it[c] }, 0.9f)
             val refRange = (reference.active[c] - reference.rest[c]).coerceAtLeast(1f)

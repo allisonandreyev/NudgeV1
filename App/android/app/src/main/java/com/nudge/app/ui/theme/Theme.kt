@@ -35,7 +35,10 @@ data class NudgeColors(
 )
 
 private val LightNudgeColors = NudgeColors(
-    channels = listOf(Color(0xFF0D9488), Color(0xFF6366F1), Color(0xFFF59E0B)),
+    channels = listOf(
+        Color(0xFF0D9488), Color(0xFF6366F1), Color(0xFFF59E0B), Color(0xFFE11D48),
+        Color(0xFF0284C7), Color(0xFF9333EA), Color(0xFF65A30D), Color(0xFFEA580C)
+    ),
     success = Color(0xFF16A34A),
     warning = Color(0xFFD97706),
     danger = Color(0xFFDC2626),
@@ -47,7 +50,10 @@ private val LightNudgeColors = NudgeColors(
 )
 
 private val DarkNudgeColors = NudgeColors(
-    channels = listOf(Color(0xFF2DD4BF), Color(0xFF818CF8), Color(0xFFFBBF24)),
+    channels = listOf(
+        Color(0xFF2DD4BF), Color(0xFF818CF8), Color(0xFFFBBF24), Color(0xFFFB7185),
+        Color(0xFF38BDF8), Color(0xFFC084FC), Color(0xFFA3E635), Color(0xFFFB923C)
+    ),
     success = Color(0xFF4ADE80),
     warning = Color(0xFFFBBF24),
     danger = Color(0xFFF87171),

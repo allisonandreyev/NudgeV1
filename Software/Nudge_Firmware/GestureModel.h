@@ -19,8 +19,8 @@
  */
 namespace GestureModel
 {
-    constexpr int CHANNELS = 3;
-    constexpr int WINDOW = 10;  // 200 ms at 50 Hz
+    constexpr int CHANNELS = 8;  // ADS1298 differential channels (16-pad strip)
+    constexpr int WINDOW = 10;   // 200 ms of 50 Hz envelope frames
     constexpr int FEATURES = CHANNELS * 3;
     constexpr int CLASSES = 4;  // CLOSE, OPEN, PINCH, REST
     // gain[CHANNELS], offset[CHANNELS], mean[FEATURES], scale[FEATURES], weights[CLASSES][FEATURES], bias[CLASSES]

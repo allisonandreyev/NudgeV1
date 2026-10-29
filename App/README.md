@@ -4,7 +4,7 @@ This directory contains the source code for the Nudge mobile application, a nati
 
 ## Key Features
 
-- Live signals: the three EMG channels on one chart, plus the gesture the wearable detects.
+- Live signals: every EMG channel (8 on the 16-pad strip, one lane each), plus the gesture the wearable detects.
 - Guided therapy: timed relax/move repetitions, recorded and optionally shared with a clinician.
 - Train AI: teaches the wearable the user's gestures in about 90 seconds, no external tools (see `Software/README.md`).
 - Play: a flappy-bird game controlled by opening the hand.

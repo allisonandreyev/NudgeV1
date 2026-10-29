@@ -52,6 +52,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val status by bluetooth.deviceStatus.collectAsState()
+    val battery by bluetooth.battery.collectAsState()
     val model by bluetooth.userModel.collectAsState()
     val sync by bluetooth.modelSync.collectAsState()
     val sessions by remember(username) { viewModel.sessionsThisWeek(username) }.collectAsState(initial = 0)
@@ -67,7 +68,7 @@ fun HomeScreen(
         ) {
             // Header
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ConnectionPill(status, onClick = { onNavigate(Routes.CONNECT) })
+                ConnectionPill(status, onClick = { onNavigate(Routes.CONNECT) }, battery = battery)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = { onNavigate(Routes.SETTINGS) }) {
                     Icon(Icons.Default.Settings, contentDescription = "Settings")

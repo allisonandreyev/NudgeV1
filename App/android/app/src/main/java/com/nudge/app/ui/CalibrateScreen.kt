@@ -43,6 +43,7 @@ fun CalibrateScreen(
 ) {
     val phase by viewModel.phase.collectAsState()
     val saved by bluetooth.userModel.collectAsState()
+    val sync by bluetooth.modelSync.collectAsState()
     val status by bluetooth.deviceStatus.collectAsState()
     val online = status == DeviceStatus.Connected || status == DeviceStatus.Demo
     val running = phase == CalibratePhase.PREPARE || phase == CalibratePhase.HOLD
@@ -54,14 +55,19 @@ fun CalibrateScreen(
             when (phase) {
                 CalibratePhase.INTRO -> {
                     val model = saved
-                    if (model?.reference == null) {
+                    if (model?.reference == null || sync == ModelSync.WrongSensors) {
                         // Nothing to compare against: no model, or one trained before recalibration existed
                         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
                             Spacer(Modifier.weight(1f))
                             EmptyState(
                                 icon = Icons.Default.WarningAmber,
-                                title = if (model == null) "Train the AI first" else "Retrain once to enable quick checks",
-                                message = "The quick check compares today's signals with the ones from training."
+                                title = when {
+                                    model == null -> "Train the AI first"
+                                    sync == ModelSync.WrongSensors -> "Retrain for these sensors"
+                                    else -> "Retrain once to enable quick checks"
+                                },
+                                message = if (sync == ModelSync.WrongSensors) "Your AI was trained on a different sensor setup, so it can't be tuned to this one."
+                                    else "The quick check compares today's signals with the ones from training."
                             )
                             Spacer(Modifier.weight(1f))
                             PrimaryButton("Train AI", onClick = onRetrain)
@@ -223,9 +229,9 @@ private fun ResultView(viewModel: CalibrateViewModel, bluetooth: BluetoothViewMo
                         SensorState.NotResponding -> "Barely responding. Check it touches the skin" to colors.danger
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(Modifier.size(10.dp), shape = CircleShape, color = NudgeTheme.colors.channels[i]) {}
+                        Surface(Modifier.size(10.dp), shape = CircleShape, color = channelColor(i)) {}
                         Spacer(Modifier.width(12.dp))
-                        Text("Sensor ${i + 1}", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.width(84.dp))
+                        Text(channelName(i, r.sensors.size), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.width(120.dp))
                         Text(text, style = MaterialTheme.typography.bodyMedium, color = color, modifier = Modifier.weight(1f))
                     }
                 }

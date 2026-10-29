@@ -27,7 +27,7 @@ class GestureModelTest {
     fun featuresOfAFlatSignalHaveNoSpreadOrMovement() {
         val f = Features.extract(List(Features.WINDOW) { floatArrayOf(100f, 200f, 300f) })
         assertEquals(kotlin.math.ln(101.0).toFloat(), f[0], 1e-5f)
-        for (i in 3 until Features.COUNT) assertEquals(0f, f[i], 1e-6f)
+        for (i in 3 until Features.count(3)) assertEquals(0f, f[i], 1e-6f)
     }
 
     @Test
@@ -65,9 +65,11 @@ class GestureModelTest {
     fun parametersRoundTripInFirmwareOrder() {
         val model = GestureTrainer.train(simulatedRecordings(rounds = 3)).model
         val params = model.toParameters()
-        assertEquals(GestureModel.PARAMETER_COUNT, params.size)
+        assertEquals(GestureModel.parameterCount(8), params.size)
+        assertEquals(164, params.size)
         val copy = GestureModel.fromParameters(params)
         val f = Features.extract(simulatedRecordings(1)[0].readings.take(Features.WINDOW))
+        assertEquals(Features.count(8), f.size)
         assertArrayEquals(model.scores(f), copy.scores(f), 1e-5f)
     }
 
@@ -78,19 +80,29 @@ class GestureModelTest {
     }
 }
 
+class ChannelCountTest {
+    @Test
+    fun legacyThreeSensorModelsStillLoad() {
+        // 58 = 3-channel model saved before recalibration existed, 64 = 3-channel with recalibration
+        assertEquals(3, GestureModel.fromParameters(FloatArray(58) { 1f }).channels)
+        assertEquals(3, GestureModel.fromParameters(FloatArray(64) { 1f }).channels)
+        assertEquals(8, GestureModel.fromParameters(FloatArray(164) { 1f }).channels)
+    }
+}
+
 class ModelProtocolTest {
     @Test
     fun linesFitInOneBluetoothWrite() {
         val sim = DemoSimulator(Random(3))
         val recs = (1..2).flatMap { r -> listOf("REST", "OPEN", "CLOSE", "PINCH").map { g -> Recording(r, g, List(60) { sim.next(g).values }) } }
         val cmds = ModelProtocol.uploadCommands(GestureTrainer.train(recs).model, id = 4242)
-        assertTrue(cmds.first().startsWith("mdl_begin 4242 ${GestureModel.PARAMETER_COUNT}"))
+        assertTrue(cmds.first().startsWith("mdl_begin 4242 ${GestureModel.parameterCount(8)}"))
         assertTrue(cmds.last().startsWith("mdl_end "))
         cmds.forEach { assertTrue("${it.length} bytes: $it", it.toByteArray().size <= 180) }
     }
 
     /**
-     * Writes a fixture for the firmware cross-check in Software/XIAO_C6_Firmware/test:
+     * Writes a fixture for the firmware cross-check in Software/Nudge_Firmware/test:
      * the upload commands, a stream of readings, and what the app's model predicts for each window.
      */
     @Test
@@ -99,13 +111,16 @@ class ModelProtocolTest {
         val recs = (1..4).flatMap { r -> listOf("REST", "OPEN", "CLOSE", "PINCH").map { g -> Recording(r, g, List(120) { sim.next(g).values }) } }
         // Include a recalibration so the firmware's per-sensor correction is exercised too
         val model = GestureTrainer.train(recs).model
-            .withCalibration(floatArrayOf(0.8f, 1.3f, 1.1f), floatArrayOf(10f, -5f, 20f))
+            .withCalibration(
+                floatArrayOf(0.8f, 1.3f, 1.1f, 0.9f, 1.2f, 1.0f, 0.7f, 1.4f),
+                floatArrayOf(1f, -0.5f, 2f, 0f, 0.5f, -1f, 1.5f, 0f)
+            )
         val out = StringBuilder()
         ModelProtocol.uploadCommands(model, id = 777).forEach { out.append("CMD ").append(it).append('\n') }
         val readings = mutableListOf<FloatArray>()
         for (g in listOf("REST", "OPEN", "CLOSE", "PINCH", "OPEN")) repeat(40) { readings += sim.next(g).values }
         readings.forEachIndexed { i, v ->
-            out.append("READ ${v[0]} ${v[1]} ${v[2]}")
+            out.append("READ ").append(v.joinToString(" "))
             if (i >= Features.WINDOW - 1) {
                 val (k, p) = model.predictWindow(readings.subList(i - Features.WINDOW + 1, i + 1))
                 out.append(" EXPECT $k $p")
@@ -154,8 +169,13 @@ class CalibrationTest {
 
     private val trained by lazy { GestureTrainer.train(record(DemoSimulator(Random(1)), rounds = 5)) }
 
-    // Sensor 1 much weaker, sensor 2 stronger, sensor 3 noisier baseline
-    private fun shifted(seed: Int) = DemoSimulator(Random(seed), floatArrayOf(0.45f, 1.6f, 0.8f), floatArrayOf(60f, -20f, 90f))
+    // Strip re-fitted badly: flexor-side channels read ~30%, extensor-side ~240%, so a fist
+    // starts to look like an open hand. Milder shifts don't confuse 8 channels at all.
+    private fun shifted(seed: Int) = DemoSimulator(
+        Random(seed),
+        floatArrayOf(0.3f, 0.3f, 0.35f, 0.3f, 2.5f, 2.2f, 2.6f, 2.4f),
+        floatArrayOf(3f, -1f, 4f, 2f, 0f, 3f, -1f, 2f)
+    )
 
     @Test
     fun movedSensorsHurtAccuracyAndRecalibrationRestoresIt() {
@@ -167,7 +187,7 @@ class CalibrationTest {
         assertTrue("recalibrated accuracy was $after", after > 0.9f)
         assertTrue(result.allRecognised)
         assertEquals(SensorState.Weaker, result.sensors[0])
-        assertEquals(SensorState.Stronger, result.sensors[1])
+        assertEquals(SensorState.Stronger, result.sensors[4])
     }
 
     @Test
@@ -180,7 +200,7 @@ class CalibrationTest {
 
     @Test
     fun deadSensorIsReported() {
-        val dead = DemoSimulator(Random(7), floatArrayOf(1f, 0f, 1f), floatArrayOf(0f, 30f, 0f))
+        val dead = DemoSimulator(Random(7), FloatArray(8) { if (it == 1) 0f else 1f }, FloatArray(8) { if (it == 1) 3f else 0f })
         val result = quickCheck(trained.model, trained.reference, dead)
         assertEquals(SensorState.NotResponding, result.sensors[1])
     }

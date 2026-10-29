@@ -18,8 +18,8 @@ int main(int argc, char** argv) {
         if (kind == "CMD") {
             GestureModel::HandleCommand(String(line.substr(4)));
         } else if (kind == "READ") {
-            float v[3];
-            ss >> v[0] >> v[1] >> v[2];
+            float v[GestureModel::CHANNELS];
+            for (float& x : v) ss >> x;
             GestureModel::Push(v);
             std::string tag;
             if (ss >> tag && tag == "EXPECT") {

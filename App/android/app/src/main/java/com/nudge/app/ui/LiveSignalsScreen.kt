@@ -48,17 +48,18 @@ fun LiveSignalsScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
-            NudgeCard(Modifier.fillMaxWidth().height(260.dp)) {
+            NudgeCard(Modifier.fillMaxWidth().height(if (channels.size > 3) 380.dp else 260.dp)) {
                 EmgChart(channels, Modifier.fillMaxSize())
             }
             Spacer(Modifier.height(12.dp))
             GestureReadout(if (online) gesture else "UNKNOWN")
-            if (sync == ModelSync.NoModel) {
+            if (sync == ModelSync.NoModel || sync == ModelSync.WrongSensors) {
                 Spacer(Modifier.height(12.dp))
                 ActionRow(
                     icon = Icons.Default.Psychology,
-                    title = "Train the AI first",
-                    subtitle = "It needs to learn your gestures before it can recognise them",
+                    title = if (sync == ModelSync.NoModel) "Train the AI first" else "Retrain for these sensors",
+                    subtitle = if (sync == ModelSync.NoModel) "It needs to learn your gestures before it can recognise them"
+                        else "Your AI was trained on a different sensor setup",
                     onClick = onTrain
                 )
             }

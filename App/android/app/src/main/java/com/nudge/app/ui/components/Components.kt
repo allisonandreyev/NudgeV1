@@ -25,7 +25,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -205,11 +207,12 @@ fun ActionRow(
 
 /** Compact device status chip. Tap to open the connect screen. */
 @Composable
-fun ConnectionPill(status: DeviceStatus, onClick: () -> Unit) {
+fun ConnectionPill(status: DeviceStatus, onClick: () -> Unit, battery: Int? = null) {
     val colors = NudgeTheme.colors
     val (label, dot) = when (status) {
-        DeviceStatus.Connected -> "Connected" to colors.success
-        DeviceStatus.Demo -> "Demo device" to colors.warning
+        DeviceStatus.Connected -> (if (battery != null) "Connected · $battery%" else "Connected") to
+            (if (battery != null && battery < 15) colors.warning else colors.success)
+        DeviceStatus.Demo -> (if (battery != null) "Demo device · $battery%" else "Demo device") to colors.warning
         DeviceStatus.Connecting -> "Connecting…" to colors.warning
         DeviceStatus.Disconnected -> "Not connected" to colors.subtle
     }
@@ -361,9 +364,19 @@ fun GestureReadout(gesture: String, modifier: Modifier = Modifier) {
     }
 }
 
+@Composable
+fun channelColor(index: Int): Color = NudgeTheme.colors.channels.let { it[index % it.size] }
+
 /**
- * Live EMG plot with all channels overlaid on a shared scale.
- * Each list in [channels] is one sensor's recent samples, oldest first.
+ * Name for a channel. On the 8-channel strip each channel is a pair of neighbouring pads:
+ * channel 1 is pads 16 (+) and 15 (-), down to channel 8 on pads 2 and 1.
+ */
+fun channelName(index: Int, total: Int): String =
+    if (total == 8) "Ch ${index + 1} (${16 - 2 * index}/${15 - 2 * index})" else "Sensor ${index + 1}"
+
+/**
+ * Live EMG plot. Each list in [channels] is one channel's recent samples, oldest first.
+ * Up to 3 channels are overlaid on a shared scale; more get one lane each with its own scale.
  */
 @Composable
 fun EmgChart(
@@ -371,6 +384,10 @@ fun EmgChart(
     modifier: Modifier = Modifier,
     showLegend: Boolean = true
 ) {
+    if (channels.size > 3) {
+        StackedEmgChart(channels, modifier, showLabels = showLegend)
+        return
+    }
     val colors = NudgeTheme.colors.channels
     val gridColor = MaterialTheme.colorScheme.outlineVariant
     Column(modifier) {
@@ -381,7 +398,7 @@ fun EmgChart(
                         Box(Modifier.size(8.dp).clip(CircleShape).background(colors[i % colors.size]))
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            "Sensor ${i + 1}  ${data.lastOrNull()?.toInt() ?: "–"}",
+                            "${channelName(i, channels.size)}  ${data.lastOrNull()?.toInt() ?: "–"}",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -412,6 +429,44 @@ fun EmgChart(
                 }
                 drawPath(path, colors[index % colors.size], style = stroke)
             }
+        }
+    }
+}
+
+@Composable
+private fun StackedEmgChart(channels: List<List<Float>>, modifier: Modifier, showLabels: Boolean) {
+    val colors = NudgeTheme.colors.channels
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val measurer = rememberTextMeasurer()
+    Canvas(modifier.fillMaxWidth().heightIn(min = 80.dp)) {
+        val lane = size.height / channels.size
+        val labelWidth = if (showLabels) 34.dp.toPx() else 0f
+        val valueWidth = if (showLabels) 40.dp.toPx() else 0f
+        val plotWidth = size.width - labelWidth - valueWidth
+        val stroke = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        channels.forEachIndexed { i, data ->
+            val top = i * lane
+            if (i > 0) drawLine(gridColor, Offset(0f, top), Offset(size.width, top), strokeWidth = 1f)
+            val color = colors[i % colors.size]
+            if (showLabels) {
+                val label = measurer.measure("${i + 1}", labelStyle.copy(color = color))
+                drawText(label, topLeft = Offset(0f, top + (lane - label.size.height) / 2))
+                val value = measurer.measure(data.lastOrNull()?.toInt()?.toString() ?: "–", labelStyle)
+                drawText(value, topLeft = Offset(size.width - value.size.width, top + (lane - value.size.height) / 2))
+            }
+            if (data.size < 2) return@forEachIndexed
+            // Each lane scales to its own channel so quiet channels stay visible
+            val lo = data.min()
+            val range = (data.max() - lo).coerceAtLeast(5f)
+            val xStep = plotWidth / (data.size - 1)
+            val path = Path()
+            data.forEachIndexed { j, v ->
+                val x = labelWidth + j * xStep
+                val y = top + lane * (0.9f - 0.8f * (v - lo) / range)
+                if (j == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            drawPath(path, color, style = stroke)
         }
     }
 }

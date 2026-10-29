@@ -5,12 +5,16 @@ This directory contains the physical design files and electrical specifications 
 ## Contents
 
 - CAD Models: 3D design files for the wearable chassis, electrode housings, and mechanical components.
-- Electrical Diagrams: Schematic and wiring diagrams for the XIAO ESP32-C6, Myoware 2.0 sensors, and the PCA9685 servo driver.
+- Electrical Diagrams: an early EMG test schematic. The current PCBs are KiCad projects in
+  `Nudge Fall Internship.zip` (`NudgePCB/Nudge` main board, `NudgePCB/NudgeEMGStrip` EMG strip).
 
 ## Component Specifications
 
-- Microcontroller: XIAO ESP32-C6
-- EMG Sensors: Myoware 2.0 (Three channels: D0, D1, D2)
-- Servo Driver: PCA9685 (I2C Address: 0x40)
+- Microcontroller: Seeed XIAO ESP32-S3 (main board)
+- EMG: 16-pad dry-electrode flex strip with a TI ADS1298 (8 differential channels, SPI) and a
+  right-leg-drive reference pad. Replaces the earlier three MyoWare 2.0 sensors.
+- Motors: two DC motors with single-channel encoders on an Adafruit DRV8833 driver, from a 9 V boost
+- Sensors: thumb and index force sensors, battery voltage
 - Communication: Bluetooth Low Energy (BLE)
-- Power: External power supply required for servo high-current requirements.
+
+Pin-by-pin wiring, the strip's pad map, and known schematic issues: `Software/Nudge_Firmware/WIRING.md`.

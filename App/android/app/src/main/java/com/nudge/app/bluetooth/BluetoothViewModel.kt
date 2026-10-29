@@ -41,7 +41,9 @@ enum class ModelSync {
     /** Sending failed a few times; the user can retry */
     Failed,
     /** The wearable's firmware predates on-device training */
-    FirmwareTooOld
+    FirmwareTooOld,
+    /** The model was trained on a different sensor setup (e.g. 3 MyoWare sensors vs the 8-channel strip) */
+    WrongSensors
 }
 
 /** One reading from the wearable: three EMG channels plus the device's gesture guess. */
@@ -99,8 +101,21 @@ class BluetoothViewModel @Inject constructor(
     val connectedName = _connectedName.asStateFlow()
 
     // Recent history per channel, for the live charts
-    private val _channels = MutableStateFlow(List(3) { emptyList<Float>() })
+    private val _channels = MutableStateFlow<List<List<Float>>>(emptyList())
+    /** Recent history per channel, oldest first. Its size is the wearable's channel count. */
     val channels = _channels.asStateFlow()
+
+    /** Channels the connected wearable sends: 8 for the 16-pad strip, 3 for MyoWare. Null until data arrives. */
+    private val _deviceChannels = MutableStateFlow<Int?>(null)
+    val deviceChannels = _deviceChannels.asStateFlow()
+
+    /** Battery 0-100 reported by the main board; null if the wearable doesn't report it. */
+    private val _battery = MutableStateFlow<Int?>(null)
+    val battery = _battery.asStateFlow()
+
+    /** Raw force-sensor readings (thumb, index), 0-4095; null if not reported. */
+    private val _grip = MutableStateFlow<Pair<Int, Int>?>(null)
+    val grip = _grip.asStateFlow()
 
     private val _lastGesture = MutableStateFlow("UNKNOWN")
     val lastGesture = _lastGesture.asStateFlow()
@@ -122,10 +137,13 @@ class BluetoothViewModel @Inject constructor(
     private val _upload = MutableStateFlow(ModelSync.NotConnected)
     private val _retry = MutableStateFlow(0)
 
-    val modelSync: StateFlow<ModelSync> = combine(userModel, deviceStatus, _deviceModelId, _upload) { model, status, deviceId, upload ->
+    val modelSync: StateFlow<ModelSync> = combine(
+        userModel, deviceStatus, _deviceModelId, _upload, _deviceChannels
+    ) { model, status, deviceId, upload, channels ->
         when {
             model == null -> ModelSync.NoModel
             status != DeviceStatus.Connected && status != DeviceStatus.Demo -> ModelSync.NotConnected
+            channels != null && channels != model.model.channels -> ModelSync.WrongSensors
             deviceId == model.id -> ModelSync.OnDevice
             deviceId == -1 -> ModelSync.FirmwareTooOld
             upload == ModelSync.Failed -> ModelSync.Failed
@@ -171,14 +189,23 @@ class BluetoothViewModel @Inject constructor(
 
         // Forget what the last wearable had installed once it's gone
         viewModelScope.launch {
-            deviceStatus.collect { if (it == DeviceStatus.Disconnected) _deviceModelId.value = null }
+            deviceStatus.collect {
+                if (it == DeviceStatus.Disconnected) {
+                    _deviceModelId.value = null
+                    _deviceChannels.value = null
+                    _battery.value = null
+                    _grip.value = null
+                }
+            }
         }
 
         // Whenever the wearable doesn't have this user's latest model, send it
         viewModelScope.launch {
-            combine(userModel, _deviceModelId, _retry) { model, deviceId, _ -> model to deviceId }
-                .collectLatest { (model, deviceId) ->
+            combine(userModel, _deviceModelId, _deviceChannels, _retry) { model, deviceId, channels, _ -> Triple(model, deviceId, channels) }
+                .collectLatest { (model, deviceId, channels) ->
                     if (model == null || deviceId == null || deviceId < 0 || deviceId == model.id) return@collectLatest
+                    // A model for a different sensor setup would be rejected by the wearable anyway
+                    if (channels != model.model.channels) return@collectLatest
                     sendModel(model)
                 }
         }
@@ -222,15 +249,26 @@ class BluetoothViewModel @Inject constructor(
         if (packet.messageId == lastMessageId) return
         lastMessageId = packet.messageId
 
-        val values = packet.data.take(3).mapNotNull { (it as? Number)?.toFloat() }
-        if (values.size < 3) return
-        val gesture = (packet.data.getOrNull(3) as? Number)?.toInt()?.let(::gestureFromIndex) ?: "UNKNOWN"
-        _deviceModelId.value = (packet.data.getOrNull(4) as? UShort)?.toInt() ?: -1
+        // Layout: one float per channel, then the gesture (int16), then the model id (uint16)
+        val values = packet.data.takeWhile { it is Float }.map { it as Float }
+        if (values.isEmpty()) return
+        val gesture = packet.data.firstOrNull { it is Short }?.let { gestureFromIndex((it as Short).toInt()) } ?: "UNKNOWN"
+        _deviceModelId.value = (packet.data.firstOrNull { it is UShort } as? UShort)?.toInt() ?: -1
+        // Main board extras after the model id: battery % (uint8), then thumb and index force (uint16)
+        val batteryIndex = packet.data.indexOfFirst { it is UByte }
+        _battery.value = (packet.data.getOrNull(batteryIndex) as? UByte)?.toInt()
+        val forces = if (batteryIndex < 0) emptyList() else packet.data.drop(batteryIndex + 1).filterIsInstance<UShort>()
+        _grip.value = if (forces.size >= 2) forces[0].toInt() to forces[1].toInt() else null
         onSample(EmgSample(System.currentTimeMillis(), values.toFloatArray(), gesture))
     }
 
     private fun onSample(sample: EmgSample) {
-        _channels.update { history -> history.mapIndexed { i, ch -> (ch + sample.values[i]).takeLast(HISTORY) } }
+        val n = sample.values.size
+        _deviceChannels.value = n
+        _channels.update { old ->
+            val history = if (old.size == n) old else List(n) { emptyList() }
+            history.mapIndexed { i, ch -> (ch + sample.values[i]).takeLast(HISTORY) }
+        }
         _lastGesture.value = sample.gesture
         _samples.tryEmit(sample)
 
@@ -315,7 +353,7 @@ class BluetoothViewModel @Inject constructor(
                 if (window.size > Features.WINDOW) window.removeFirst()
 
                 // Classify on the "device" with whatever model was sent to it, like the firmware does
-                val model = userModel.value?.takeIf { it.id == demoInstalledId }?.model
+                val model = userModel.value?.takeIf { it.id == demoInstalledId && it.model.channels == reading.values.size }?.model
                 val gesture = if (model != null && window.size == Features.WINDOW) {
                     val (index, probability) = model.predictWindow(window.toList())
                     smoother.update(index, probability).let { if (it < 0) "UNKNOWN" else model.classes[it] }
@@ -323,6 +361,10 @@ class BluetoothViewModel @Inject constructor(
                     "UNKNOWN"
                 }
                 _deviceModelId.value = demoInstalledId
+                _battery.value = 87
+                // Fingers press on something while the simulated hand is closed
+                val pressing = (_activeLabel.value ?: gesture) == "CLOSE"
+                _grip.value = if (pressing) 2200 to 1800 else 40 to 30
                 onSample(reading.copy(gesture = gesture))
                 delay(1000L / DemoSimulator.RATE_HZ)
             }

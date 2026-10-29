@@ -16,7 +16,7 @@ object CSVExporter {
     fun exportSession(context: Context, sessionId: Long, dataPoints: List<DataPoint>) =
         export(context, "nudge_session_${sessionId}.csv", dataPoints, "Export session")
 
-    /** Writes one row per reading (all three sensors share a timestamp) and opens the share sheet. */
+    /** Writes one row per reading (all channels share a timestamp) and opens the share sheet. */
     private fun export(context: Context, fileName: String, dataPoints: List<DataPoint>, title: String) {
         if (dataPoints.isEmpty()) {
             Toast.makeText(context, "Nothing to export yet", Toast.LENGTH_SHORT).show()
@@ -25,12 +25,13 @@ object CSVExporter {
         try {
             val file = File(context.cacheDir, fileName)
             val startTime = dataPoints.minOf { it.timestamp }
+            val channels = dataPoints.maxOf { it.sensorId } + 1
             file.bufferedWriter().use { out ->
-                out.write("time_ms,sensor_1,sensor_2,sensor_3,label\n")
+                out.write("time_ms," + (1..channels).joinToString(",") { "channel_$it" } + ",label\n")
                 dataPoints.groupBy { it.timestamp }.toSortedMap().forEach { (time, points) ->
-                    val value = { sensor: Int -> points.find { it.sensorId == sensor }?.value ?: "" }
+                    val values = (0 until channels).joinToString(",") { c -> points.find { it.sensorId == c }?.value?.toString() ?: "" }
                     val label = points.firstNotNullOfOrNull { it.label } ?: ""
-                    out.write("${time - startTime},${value(0)},${value(1)},${value(2)},$label\n")
+                    out.write("${time - startTime},$values,$label\n")
                 }
             }
             share(context, file, title)

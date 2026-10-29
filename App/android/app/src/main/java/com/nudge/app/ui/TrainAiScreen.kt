@@ -115,7 +115,8 @@ private fun IntroView(
                 CurrentModelCard(saved, sync, onRetrySync)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "If gestures aren't recognised as well as before, start with a quick check. Retrain only if that doesn't help.",
+                    if (sync == ModelSync.WrongSensors) "This wearable has a different sensor setup, so the AI needs to learn your gestures again."
+                    else "If gestures aren't recognised as well as before, start with a quick check. Retrain only if that doesn't help.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -125,6 +126,9 @@ private fun IntroView(
         }
         if (saved == null) {
             PrimaryButton("Start recording", icon = Icons.Default.PlayArrow, enabled = online, onClick = onStart)
+        } else if (sync == ModelSync.WrongSensors) {
+            // A quick check can't adapt a model to different sensors; only retraining helps
+            PrimaryButton("Retrain for this wearable", icon = Icons.Default.PlayArrow, enabled = online, onClick = onStart)
         } else {
             PrimaryButton("Quick check (15 s)", enabled = online, onClick = onCalibrate)
             Spacer(Modifier.height(10.dp))
@@ -403,6 +407,7 @@ private fun SyncLine(sync: ModelSync, onRetrySync: () -> Unit) {
         ModelSync.NotConnected -> "Saved. It'll be sent when your wearable connects." to colors.subtle
         ModelSync.Failed -> "Couldn't send to the wearable" to colors.danger
         ModelSync.FirmwareTooOld -> "Your wearable needs a firmware update to use it" to colors.danger
+        ModelSync.WrongSensors -> "Trained for different sensors. Retrain with this wearable." to colors.danger
         ModelSync.NoModel -> "Not trained yet" to colors.subtle
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
