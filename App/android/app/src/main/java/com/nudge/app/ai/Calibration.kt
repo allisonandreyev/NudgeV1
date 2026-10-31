@@ -18,7 +18,7 @@ data class CalibrationResult(
 }
 
 /**
- * Quick recalibration: the user relaxes, makes a fist and opens their hand. Each sensor's
+ * Quick recalibration: the user relaxes, makes a fist and (if the model knows it) opens their hand. Each sensor's
  * relaxed level and active level are compared with training day and a straight-line correction
  * maps today's readings back onto training-day readings. The trained model itself is unchanged.
  *
@@ -34,9 +34,11 @@ object Calibration {
         reference: ChannelReference,
         rest: List<FloatArray>,
         fist: List<FloatArray>,
+        /** Empty for models that don't know OPEN (a single sensor). */
         open: List<FloatArray>
     ): CalibrationResult {
-        require(rest.size >= Features.WINDOW && fist.size >= Features.WINDOW && open.size >= Features.WINDOW) {
+        val needsOpen = "OPEN" in base.classes
+        require(rest.size >= Features.WINDOW && fist.size >= Features.WINDOW && (!needsOpen || open.size >= Features.WINDOW)) {
             "Not enough readings"
         }
         val active = fist + open
@@ -67,9 +69,9 @@ object Calibration {
         }
 
         val model = base.withCalibration(gain, offset)
-        val recognised = mapOf("REST" to rest, "CLOSE" to fist, "OPEN" to open).mapValues { (gesture, readings) ->
-            recognisedMostly(model, gesture, readings)
-        }
+        val recognised = mapOf("REST" to rest, "CLOSE" to fist, "OPEN" to open)
+            .filterKeys { it in base.classes }
+            .mapValues { (gesture, readings) -> recognisedMostly(model, gesture, readings) }
         return CalibrationResult(model, states, strength, recognised)
     }
 

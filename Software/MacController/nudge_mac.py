@@ -38,7 +38,6 @@ TYPE_UINT16 = 0x1116
 TYPE_UINT8 = 0x1115
 HEADER_SIZE = 6
 
-GESTURES = {0: "CLOSE", 1: "OPEN", 2: "PINCH", 3: "REST"}
 GESTURE_COLORS = {"CLOSE": "#dc2626", "OPEN": "#16a34a", "PINCH": "#d97706", "REST": "#64748b"}
 GESTURE_NAMES = {"REST": "Relax", "OPEN": "Open hand", "CLOSE": "Close fist", "PINCH": "Pinch", "UNKNOWN": "—"}
 GESTURE_HINTS = {
@@ -53,15 +52,18 @@ CHANNEL_COLORS = ["#0d9488", "#6366f1", "#f59e0b", "#e11d48", "#0284c7", "#9333e
 
 
 def channel_name(i, total):
-    """On the 8-channel strip, channel 1 is pads 16 (+) / 15 (-), down to channel 8 on pads 2 / 1."""
+    """A single channel is the rev2 board's MyoWare. On the 8-channel strip, channel 1 is
+    pads 16 (+) / 15 (-), down to channel 8 on pads 2 / 1."""
+    if total == 1:
+        return "Muscle sensor"
     return f"Ch{i + 1} ({16 - 2 * i}/{15 - 2 * i})" if total == 8 else f"Sensor {i + 1}"
 SERVO_SPEED = 150
 
 TRAIN_ROUNDS = 5
-TRAIN_ORDER = ["REST", "OPEN", "CLOSE", "PINCH"]
+TRAIN_ORDER = ["REST", "OPEN", "CLOSE", "PINCH"]  # one sensor only does REST and CLOSE
 PREPARE_S = 1.5
 HOLD_S = 3.0
-CHECK_STEPS = [("REST", 4.0), ("CLOSE", 3.0), ("OPEN", 3.0)]
+CHECK_STEPS = [("REST", 4.0), ("CLOSE", 3.0), ("OPEN", 3.0)]  # OPEN only if the model knows it
 UPLOAD_ATTEMPTS = 3
 UPLOAD_TIMEOUT_S = 6.0
 
@@ -94,13 +96,13 @@ def parse_packet(data: bytes):
     return emg, gesture, model_id, battery, (tuple(forces[:2]) if len(forces) >= 2 else None)
 
 
-def build_packet(message_id: int, emg, gesture: int, model_id: int, battery=87, grip=(40, 30)) -> bytes:
-    """Same layout the main-board firmware sends. Only used by --simulate."""
+def build_packet(message_id: int, emg, gesture: int, model_id: int, battery=87, grip=None) -> bytes:
+    """Same layout the firmware sends; [grip] only on boards with force sensors (not rev2). Only used by --simulate."""
     body = b"".join(struct.pack(">HH", TYPE_FLOAT, 4) + struct.pack("<f", v) for v in emg)
     body += struct.pack(">HH", TYPE_INT16, 2) + struct.pack("<h", gesture)
     body += struct.pack(">HH", TYPE_UINT16, 2) + struct.pack("<H", model_id)
     body += struct.pack(">HH", TYPE_UINT8, 1) + bytes([battery])
-    for f in grip:
+    for f in grip or ():
         body += struct.pack(">HH", TYPE_UINT16, 2) + struct.pack("<H", f)
     return bytes([0x01, 0x00, message_id & 0xFF, 0x10, 0x00, len(body)]) + body
 
@@ -116,9 +118,9 @@ class Controller:
         self.status = "Starting..."
         self.gesture = "UNKNOWN"
         self.channels = [deque([0.0] * HISTORY, maxlen=HISTORY) for _ in range(nm.CHANNELS)]
-        self.device_channels = None  # channels the wearable sends: 8 for the strip, 3 for MyoWare
+        self.device_channels = None  # channels the wearable sends: 1 for the rev2 MyoWare, 8 for the strip
         self.battery = None  # main board battery %
-        self.grip = None  # (thumb, index) force-sensor readings
+        self.grip = None  # (thumb, index) force-sensor readings, on boards that have them
         self.tasks = set()
 
         # Model on the wearable: None until it reports, -1 if its firmware can't hold one
@@ -150,7 +152,9 @@ class Controller:
         self.device_channels = len(emg)
         for channel, value in zip(self.channels, emg):
             channel.append(value)
-        self.gesture = GESTURES.get(gesture, "UNKNOWN")
+        # A one-sensor model has its own gesture list, so name the index with the installed model's
+        classes = self.saved.model.classes if self.saved and self.saved.id == model_id else nm.CLASSES
+        self.gesture = classes[gesture] if 0 <= gesture < len(classes) else "UNKNOWN"
         self.device_model_id = model_id
         if self.recording is not None:
             self.recording.append(list(emg))
@@ -266,9 +270,11 @@ class Controller:
         for i in (3, 2, 1):
             self.prompt = ("Get ready", f"Starting in {i}", "#0f766e")
             await asyncio.sleep(1)
+        classes = nm.classes_for(self.device_channels or nm.CHANNELS)
+        order = [g for g in TRAIN_ORDER if g in classes]
         recordings = []
         for r in range(1, TRAIN_ROUNDS + 1):
-            for g in TRAIN_ORDER:
+            for g in order:
                 readings = []
                 self.progress = f"Round {r} of {TRAIN_ROUNDS}"
                 await self.hold(g, HOLD_S, readings, f"Round {r} of {TRAIN_ROUNDS}")
@@ -276,11 +282,11 @@ class Controller:
         self.prompted = None
         self.prompt = ("Learning your gestures…", "", "#0f766e")
         try:
-            result = await asyncio.to_thread(nm.train, recordings)
+            result = await asyncio.to_thread(nm.train, recordings, classes)
         except ValueError:
             self.info = "Not enough data. Make sure the wearable stays connected, then train again."
             return
-        per = "   ".join(f"{GESTURE_NAMES[g]} {result.per_gesture.get(g, 0) * 100:.0f}%" for g in TRAIN_ORDER)
+        per = "   ".join(f"{GESTURE_NAMES[g]} {result.per_gesture.get(g, 0) * 100:.0f}%" for g in order)
         acc = result.accuracy or 0
         if acc < nm.GOOD_ACCURACY:
             self.info = (f"Accuracy {acc * 100:.0f}% is low, so it wasn't saved; your previous model stays. "
@@ -296,14 +302,15 @@ class Controller:
         if self.saved is None or self.saved.reference is None or self.wrong_sensors():
             self.info = "Train the AI first. (Retrain if it was trained on different sensors or before quick checks existed.)"
             return
+        steps = [(g, t) for g, t in CHECK_STEPS if g in self.saved.model.classes]
         recorded = {}
-        for i, (g, seconds) in enumerate(CHECK_STEPS):
+        for i, (g, seconds) in enumerate(steps):
             recorded[g] = []
-            self.progress = f"Quick check: step {i + 1} of {len(CHECK_STEPS)}"
-            await self.hold(g, seconds, recorded[g], f"Step {i + 1} of {len(CHECK_STEPS)}")
+            self.progress = f"Quick check: step {i + 1} of {len(steps)}"
+            await self.hold(g, seconds, recorded[g], f"Step {i + 1} of {len(steps)}")
         self.prompted = None
         try:
-            result = nm.calibrate(self.saved.model, self.saved.reference, recorded["REST"], recorded["CLOSE"], recorded["OPEN"])
+            result = nm.calibrate(self.saved.model, self.saved.reference, recorded["REST"], recorded["CLOSE"], recorded.get("OPEN", []))
         except ValueError:
             self.info = "Not enough signal. Make sure the wearable stays connected for the whole check."
             return
@@ -365,9 +372,8 @@ class Controller:
         while self.running:
             reading = self.simulator.next(self.prompted)
             gesture = self.wearable.classify(reading)
-            # Fingers press on something while the simulated hand is closed
-            grip = (2200, 1800) if self.prompted == "CLOSE" or gesture == 0 else (40, 30)
-            self.on_packet(None, bytearray(build_packet(message_id, reading, gesture, self.wearable.model_id, grip=grip)))
+            # Like the rev2 board: no force sensors in the packet
+            self.on_packet(None, bytearray(build_packet(message_id, reading, gesture, self.wearable.model_id)))
             message_id += 1
             await asyncio.sleep(0.02)
 
@@ -427,7 +433,7 @@ class Controller:
             ("AI off", cmd("ai_stop"), "0.93"),
             ("Close hand", cmd(f"grasp 255 {SERVO_SPEED}"), "0.93"),
             ("Open hand", cmd(f"retract 255 {SERVO_SPEED}"), "0.93"),
-            ("Calibrate motors", cmd("calibrate"), "0.93"),
+            ("Calibrate motor", cmd("calibrate"), "0.93"),
             ("Status", cmd("status"), "0.93"),
             ("STOP", cmd("stop"), "#fecaca"),
         ])

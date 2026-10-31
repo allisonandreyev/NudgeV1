@@ -14,20 +14,28 @@ from pathlib import Path
 
 import numpy as np
 
-CHANNELS = 8  # 16-pad ADS1298 strip; models work with any count (3 for the old MyoWare sensors)
+CHANNELS = 1  # the rev2 board's MyoWare; models work with any count (8 for the 16-pad strip)
+STRIP_CHANNELS = 8
 WINDOW = 10  # 200 ms at 50 Hz
 # Order the firmware reports gestures in: 0/2 close the hand, 1/3 open it
 CLASSES = ["CLOSE", "OPEN", "PINCH", "REST"]
+# One sensor can only tell a squeeze from relaxing; relaxing opens the hand (index 1)
+SQUEEZE_CLASSES = ["CLOSE", "REST"]
 
 
-def _core_count(channels):
+def classes_for(channels):
+    """Gestures a wearable with this many sensors is trained on, in firmware order."""
+    return SQUEEZE_CLASSES if channels == 1 else CLASSES
+
+
+def _core_count(channels, classes=None):
     f = channels * 3
-    return f * 2 + len(CLASSES) * (f + 1)
+    return f * 2 + (classes or len(classes_for(channels))) * (f + 1)
 
 
-def parameter_count(channels=CHANNELS):
-    """Values sent to the wearable: 64 for 3 channels, 164 for the 8-channel strip."""
-    return channels * 2 + _core_count(channels)
+def parameter_count(channels=CHANNELS, classes=None):
+    """Values sent to the wearable: 16 for one MyoWare (2 gestures), 164 for the 8-channel strip."""
+    return channels * 2 + _core_count(channels, classes)
 SHRINKAGE = 0.1
 GOOD_ACCURACY = 0.7
 
@@ -62,6 +70,7 @@ class Model:
     bias: np.ndarray
     gain: np.ndarray = None
     offset: np.ndarray = None
+    classes: list = None  # gesture names in firmware order
 
     def __post_init__(self):
         n = len(self.mean) // 3
@@ -69,6 +78,8 @@ class Model:
             self.gain = np.ones(n, dtype=np.float32)
         if self.offset is None:
             self.offset = np.zeros(n, dtype=np.float32)
+        if self.classes is None:
+            self.classes = classes_for(n)
 
     @property
     def channels(self):
@@ -89,26 +100,30 @@ class Model:
 
     def with_calibration(self, gain, offset) -> "Model":
         return Model(self.mean, self.scale, self.weights, self.bias,
-                     np.asarray(gain, dtype=np.float32), np.asarray(offset, dtype=np.float32))
+                     np.asarray(gain, dtype=np.float32), np.asarray(offset, dtype=np.float32), self.classes)
 
     def parameters(self) -> np.ndarray:
         return np.concatenate([self.gain, self.offset, self.mean, self.scale, self.weights.ravel(), self.bias]).astype(np.float32)
 
     @staticmethod
-    def from_parameters(p) -> "Model":
+    def from_parameters(p, classes=None) -> "Model":
+        """[classes]: the saved gesture list; without it, the usual one for the channel count."""
         p = np.asarray(p, dtype=np.float32)
-        ch = next((c for c in range(1, 17) if parameter_count(c) == len(p)), None)
+
+        def k(c):
+            return len(classes) if classes else len(classes_for(c))
+        ch = next((c for c in range(1, 17) if parameter_count(c, k(c)) == len(p)), None)
         if ch is None:  # saved before recalibration existed: no gain/offset
-            ch = next((c for c in range(1, 17) if _core_count(c) == len(p)), None)
+            ch = next((c for c in range(1, 17) if _core_count(c, k(c)) == len(p)), None)
             if ch is None:
                 raise ValueError(f"Unexpected parameter count {len(p)}")
             p = np.concatenate([np.ones(ch), np.zeros(ch), p]).astype(np.float32)
         b = ch * 2
-        n, k = ch * 3, len(CLASSES)
+        n, kk = ch * 3, k(ch)
         return Model(
             mean=p[b:b + n], scale=p[b + n:b + 2 * n],
-            weights=p[b + 2 * n:b + 2 * n + k * n].reshape(k, n), bias=p[-k:],
-            gain=p[:ch], offset=p[ch:b],
+            weights=p[b + 2 * n:b + 2 * n + kk * n].reshape(kk, n), bias=p[-kk:],
+            gain=p[:ch], offset=p[ch:b], classes=list(classes or classes_for(ch)),
         )
 
 
@@ -119,8 +134,8 @@ class Recording:
     readings: list
 
 
-def fit(recordings) -> Model:
-    by_class = [np.array([f for r in recordings if r.label == c for f in slide(r.readings)], dtype=np.float64) for c in CLASSES]
+def fit(recordings, classes) -> Model:
+    by_class = [np.array([f for r in recordings if r.label == c for f in slide(r.readings)], dtype=np.float64) for c in classes]
     if any(len(x) < 2 for x in by_class):
         raise ValueError("Every gesture needs recorded data")
     allf = np.vstack(by_class)
@@ -128,13 +143,14 @@ def fit(recordings) -> Model:
     scale = np.maximum(np.sqrt(((allf - mean) ** 2).mean(axis=0)), 1e-3)
     z = [(x - mean) / scale for x in by_class]
     centres = np.array([x.mean(axis=0) for x in z])
-    cov = sum((x - c).T @ (x - c) for x, c in zip(z, centres)) / max(len(allf) - len(CLASSES), 1)
+    cov = sum((x - c).T @ (x - c) for x, c in zip(z, centres)) / max(len(allf) - len(classes), 1)
     # Shrink toward a diagonal so short recordings still give a stable inverse
     d = allf.shape[1]
     cov = (1 - SHRINKAGE) * cov + SHRINKAGE * np.trace(cov) / d * np.eye(d)
     weights = centres @ np.linalg.inv(cov)
-    bias = -0.5 * np.einsum("kd,kd->k", weights, centres) + math.log(1 / len(CLASSES))
-    return Model(mean.astype(np.float32), scale.astype(np.float32), weights.astype(np.float32), bias.astype(np.float32))
+    bias = -0.5 * np.einsum("kd,kd->k", weights, centres) + math.log(1 / len(classes))
+    return Model(mean.astype(np.float32), scale.astype(np.float32), weights.astype(np.float32), bias.astype(np.float32),
+                 classes=list(classes))
 
 
 @dataclass
@@ -162,23 +178,25 @@ class TrainingResult:
     per_gesture: dict
 
 
-def train(recordings) -> TrainingResult:
-    model = fit(recordings)
+def train(recordings, classes=None) -> TrainingResult:
+    """[classes] defaults to the usual gestures for the recordings' channel count."""
+    classes = classes or classes_for(len(recordings[0].readings[0]))
+    model = fit(recordings, classes)
     rounds = sorted({r.round for r in recordings})
     correct, total = {}, {}
     if len(rounds) >= 2:
         # Check on each round in turn after training on the others
         for held in rounds:
             train_set = [r for r in recordings if r.round != held]
-            if any(not any(r.label == c for r in train_set) for c in CLASSES):
+            if any(not any(r.label == c for r in train_set) for c in classes):
                 continue
-            m = fit(train_set)
+            m = fit(train_set, classes)
             for r in recordings:
                 if r.round != held:
                     continue
                 for f in slide(r.readings):
                     total[r.label] = total.get(r.label, 0) + 1
-                    if CLASSES[m.predict_features(f)[0]] == r.label:
+                    if classes[m.predict_features(f)[0]] == r.label:
                         correct[r.label] = correct.get(r.label, 0) + 1
     n = sum(total.values())
     accuracy = sum(correct.values()) / n if n else None
@@ -203,9 +221,11 @@ class CalibrationResult:
         return all(self.recognised.values())
 
 
-def calibrate(base: Model, ref: Reference, rest, fist, open_) -> CalibrationResult:
-    """Corrects each sensor so today's relaxed and active levels match training day."""
-    if min(len(rest), len(fist), len(open_)) < WINDOW:
+def calibrate(base: Model, ref: Reference, rest, fist, open_=()) -> CalibrationResult:
+    """Corrects each sensor so today's relaxed and active levels match training day.
+    [open_] is only needed for models that know OPEN (not a single sensor)."""
+    needs_open = "OPEN" in base.classes
+    if min(len(rest), len(fist), len(open_) if needs_open else WINDOW) < WINDOW:
         raise ValueError("Not enough readings")
     active = list(fist) + list(open_)
     if len(rest[0]) != base.channels:
@@ -227,10 +247,11 @@ def calibrate(base: Model, ref: Reference, rest, fist, open_) -> CalibrationResu
 
     def mostly(gesture, readings):
         windows = [readings[i:i + WINDOW] for i in range(0, len(readings) - WINDOW + 1, 2)]
-        hits = sum(CLASSES[model.predict_window(w)[0]] == gesture for w in windows)
+        hits = sum(model.classes[model.predict_window(w)[0]] == gesture for w in windows)
         return hits * 2 > len(windows)
 
-    recognised = {"REST": mostly("REST", rest), "CLOSE": mostly("CLOSE", fist), "OPEN": mostly("OPEN", open_)}
+    checks = {"REST": rest, "CLOSE": fist, "OPEN": open_}
+    recognised = {g: mostly(g, r) for g, r in checks.items() if g in base.classes}
     return CalibrationResult(model, states, strength, recognised)
 
 
@@ -267,7 +288,7 @@ def new_id(avoid=0) -> int:
 def save(path: Path, saved: SavedModel):
     data = {
         "id": saved.id,
-        "classes": CLASSES,
+        "classes": saved.model.classes,
         "parameters": [float(v) for v in saved.model.parameters()],
         "accuracy": saved.accuracy,
         "perGesture": saved.per_gesture,
@@ -288,7 +309,7 @@ def load(path: Path) -> SavedModel | None:
     ref = None
     if "referenceRest" in d and "referenceActive" in d:
         ref = Reference(np.array(d["referenceRest"], dtype=np.float32), np.array(d["referenceActive"], dtype=np.float32))
-    return SavedModel(d["id"], Model.from_parameters(d["parameters"]), d.get("accuracy"), d.get("perGesture", {}),
+    return SavedModel(d["id"], Model.from_parameters(d["parameters"], d.get("classes")), d.get("accuracy"), d.get("perGesture", {}),
                       d["trainedAt"], ref, d.get("calibratedAt"))
 
 
@@ -321,8 +342,11 @@ class SimulatedWearable:
             for i, v in enumerate(parts[2:]):
                 self._staging[start + i] = float(v)
         elif parts[0] == "mdl_end":
-            if len(self._staging) == parameter_count(self.channels) and abs(sum(self._staging.values()) - float(parts[1])) <= 1e-3 * (1 + abs(float(parts[1]))):
-                self.model = Model.from_parameters([self._staging[i] for i in range(parameter_count(self.channels))])
+            # Like the firmware: two- or four-gesture models for this many sensors
+            sizes = {parameter_count(self.channels, 2): SQUEEZE_CLASSES, parameter_count(self.channels, 4): CLASSES}
+            n = len(self._staging)
+            if n in sizes and abs(sum(self._staging.values()) - float(parts[1])) <= 1e-3 * (1 + abs(float(parts[1]))):
+                self.model = Model.from_parameters([self._staging[i] for i in range(n)], sizes[n])
                 self.model_id = self._staging_id
         elif parts[0] == "mdl_clear":
             self.model, self.model_id = None, 0
@@ -343,9 +367,16 @@ class SimulatedWearable:
 
 
 class Simulator:
-    """Believable 8-channel strip envelopes (microvolts) per gesture; mirrors the app's DemoSimulator.
-    Channels 1-4 roughly over the flexors, 5-8 the extensors."""
-    PATTERNS = {
+    """Believable EMG envelopes per gesture; mirrors the app's DemoSimulator. The channel count is
+    len(gain): 1 is the rev2 board's MyoWare on the forearm flexors (millivolts), 8 the 16-pad
+    strip (microvolts; channels 1-4 roughly over the flexors, 5-8 the extensors)."""
+    MYOWARE_PATTERNS = {
+        "REST": (40,),
+        "OPEN": (260,),
+        "CLOSE": (1100,),
+        "PINCH": (520,),
+    }
+    STRIP_PATTERNS = {
         "REST": (4, 4, 5, 4, 4, 5, 4, 4),
         "OPEN": (8, 10, 12, 9, 60, 110, 90, 40),
         "CLOSE": (90, 120, 100, 60, 20, 30, 25, 15),
@@ -353,23 +384,31 @@ class Simulator:
     }
     CYCLE = ["REST", "OPEN", "REST", "CLOSE", "REST", "PINCH"]
 
-    def __init__(self, rng=None, gain=(1,) * CHANNELS, offset=(0,) * CHANNELS):
+    def __init__(self, rng=None, gain=(1,) * CHANNELS, offset=None):
         self.rng = rng or random.Random()
-        self.gain, self.offset = gain, offset
-        self.levels = [4.0] * CHANNELS
+        self.gain, self.offset = gain, offset or (0,) * len(gain)
+        self.patterns = {1: self.MYOWARE_PATTERNS, STRIP_CHANNELS: self.STRIP_PATTERNS}[len(gain)]
+        self.levels = [float(v) for v in self.patterns["REST"]]
         self.tick = 0
 
     @classmethod
-    def random_placement(cls, rng=None):
+    def strip(cls, rng=None):
+        """The 16-pad strip at an ideal placement."""
+        return cls(rng, (1,) * STRIP_CHANNELS)
+
+    @classmethod
+    def random_placement(cls, rng=None, channels=CHANNELS):
         rng = rng or random.Random()
-        return cls(rng, tuple(0.6 + rng.random() * 0.9 for _ in range(CHANNELS)),
-                   tuple(rng.random() * 4 - 1 for _ in range(CHANNELS)))
+        # Offsets in the sensor's own units: millivolts for the MyoWare, microvolts for the strip
+        spread = 40 if channels == 1 else 4
+        return cls(rng, tuple(0.6 + rng.random() * 0.9 for _ in range(channels)),
+                   tuple((rng.random() - 0.25) * spread for _ in range(channels)))
 
     def next(self, target=None):
         self.tick += 1
         gesture = target or self.CYCLE[int(self.tick / 125) % len(self.CYCLE)]
         out = []
-        for i, p in enumerate(self.PATTERNS[gesture]):
+        for i, p in enumerate(self.patterns[gesture]):
             self.levels[i] += (p - self.levels[i]) * 0.15
             tremor = 1 + 0.08 * math.sin(self.tick * 0.6 + i * 2)
             noise = self.rng.random() * 0.2 + 0.9

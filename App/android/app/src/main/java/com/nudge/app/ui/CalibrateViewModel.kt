@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nudge.app.ai.Calibration
 import com.nudge.app.ai.CalibrationResult
+import com.nudge.app.ai.GestureModel
 import com.nudge.app.ai.ModelRepository
 import com.nudge.app.ai.SavedModel
 import com.nudge.app.bluetooth.EmgSample
@@ -24,7 +25,7 @@ enum class CalibratePhase { INTRO, PREPARE, HOLD, RESULT, FAILED }
 data class CalibrateStep(val gesture: String, val holdMs: Long)
 
 /**
- * Runs the 15-second check (relax, fist, open), works out how each sensor shifted since
+ * Runs the quick check (relax, fist, and open if the model knows it), works out how each sensor shifted since
  * training, and saves the corrected model, which then goes to the wearable automatically.
  */
 @HiltViewModel
@@ -32,7 +33,9 @@ class CalibrateViewModel @Inject constructor(
     private val models: ModelRepository
 ) : ViewModel() {
 
-    val steps = listOf(CalibrateStep("REST", 4000), CalibrateStep("CLOSE", 3000), CalibrateStep("OPEN", 3000))
+    /** Steps of the check being run. Set by [start]. */
+    var steps = stepsFor(null)
+        private set
 
     private val _phase = MutableStateFlow(CalibratePhase.INTRO)
     val phase = _phase.asStateFlow()
@@ -53,11 +56,11 @@ class CalibrateViewModel @Inject constructor(
     private var username = ""
     private var base: SavedModel? = null
 
-    val totalSeconds: Int get() = ((steps.sumOf { it.holdMs } + steps.size * PREPARE_MS) / 1000).toInt()
-
     fun start(username: String, saved: SavedModel, readings: Flow<EmgSample>, onPrompt: (String?) -> Unit) {
         this.username = username
         base = saved
+        val steps = stepsFor(saved.model)
+        this.steps = steps
         _result.value = null
         _applied.value = false
         job?.cancel()
@@ -86,7 +89,7 @@ class CalibrateViewModel @Inject constructor(
             val reference = saved.reference
             val result = if (reference == null) null else try {
                 withContext(Dispatchers.Default) {
-                    Calibration.compute(saved.model, reference, recorded.getValue("REST"), recorded.getValue("CLOSE"), recorded.getValue("OPEN"))
+                    Calibration.compute(saved.model, reference, recorded.getValue("REST"), recorded.getValue("CLOSE"), recorded["OPEN"].orEmpty())
                 }
             } catch (e: Exception) {
                 null
@@ -116,6 +119,13 @@ class CalibrateViewModel @Inject constructor(
     }
 
     companion object {
+        /** Relax, fist, then open, skipping gestures [model] doesn't know (one sensor has no OPEN). */
+        fun stepsFor(model: GestureModel?): List<CalibrateStep> =
+            listOf(CalibrateStep("REST", 4000), CalibrateStep("CLOSE", 3000), CalibrateStep("OPEN", 3000))
+                .filter { model == null || it.gesture in model.classes }
+
+        fun totalSeconds(steps: List<CalibrateStep>): Int = ((steps.sumOf { it.holdMs } + steps.size * PREPARE_MS) / 1000).toInt()
+
         const val PREPARE_MS = 1500L
         private const val TICK_MS = 50L
     }

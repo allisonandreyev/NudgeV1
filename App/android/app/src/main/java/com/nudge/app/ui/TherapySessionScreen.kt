@@ -101,7 +101,7 @@ private fun SetupView(
                 ActionRow(
                     icon = Icons.Default.Tune,
                     title = "Quick check first",
-                    subtitle = "15 seconds to tune the AI to today's fit",
+                    subtitle = "A few seconds to tune the AI to today's fit",
                     onClick = onCalibrate
                 )
                 Spacer(Modifier.height(20.dp))

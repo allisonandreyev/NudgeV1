@@ -11,6 +11,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nudge.app.ai.Features
+import com.nudge.app.ai.GestureModel
 import com.nudge.app.ai.GestureSmoother
 import com.nudge.app.ai.ModelProtocol
 import com.nudge.app.ai.ModelRepository
@@ -42,23 +43,18 @@ enum class ModelSync {
     Failed,
     /** The wearable's firmware predates on-device training */
     FirmwareTooOld,
-    /** The model was trained on a different sensor setup (e.g. 3 MyoWare sensors vs the 8-channel strip) */
+    /** The model was trained on a different sensor setup (e.g. one MyoWare vs the 8-channel strip) */
     WrongSensors
 }
 
-/** One reading from the wearable: three EMG channels plus the device's gesture guess. */
+/** One reading from the wearable: one value per EMG channel plus the device's gesture guess. */
 data class EmgSample(val timestamp: Long, val values: FloatArray, val gesture: String)
 
 val GESTURES = listOf("REST", "OPEN", "PINCH", "CLOSE")
 
-/** Gesture indices as sent by the firmware. Order matches the trained model's labels. */
-fun gestureFromIndex(index: Int): String = when (index) {
-    0 -> "CLOSE"
-    1 -> "OPEN"
-    2 -> "PINCH"
-    3 -> "REST"
-    else -> "UNKNOWN"
-}
+/** Gesture index as sent by the firmware, named with the installed model's labels. */
+fun gestureFromIndex(index: Int, classes: List<String> = GestureModel.FIRMWARE_CLASSES): String =
+    classes.getOrNull(index) ?: "UNKNOWN"
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -105,7 +101,7 @@ class BluetoothViewModel @Inject constructor(
     /** Recent history per channel, oldest first. Its size is the wearable's channel count. */
     val channels = _channels.asStateFlow()
 
-    /** Channels the connected wearable sends: 8 for the 16-pad strip, 3 for MyoWare. Null until data arrives. */
+    /** Channels the connected wearable sends: 1 for the rev2 board's MyoWare, 8 for the 16-pad strip. Null until data arrives. */
     private val _deviceChannels = MutableStateFlow<Int?>(null)
     val deviceChannels = _deviceChannels.asStateFlow()
 
@@ -252,8 +248,11 @@ class BluetoothViewModel @Inject constructor(
         // Layout: one float per channel, then the gesture (int16), then the model id (uint16)
         val values = packet.data.takeWhile { it is Float }.map { it as Float }
         if (values.isEmpty()) return
-        val gesture = packet.data.firstOrNull { it is Short }?.let { gestureFromIndex((it as Short).toInt()) } ?: "UNKNOWN"
-        _deviceModelId.value = (packet.data.firstOrNull { it is UShort } as? UShort)?.toInt() ?: -1
+        val modelId = (packet.data.firstOrNull { it is UShort } as? UShort)?.toInt() ?: -1
+        _deviceModelId.value = modelId
+        // A one-sensor model has its own gesture list, so name the index with the installed model's
+        val classes = userModel.value?.takeIf { it.id == modelId }?.model?.classes ?: GestureModel.FIRMWARE_CLASSES
+        val gesture = packet.data.firstOrNull { it is Short }?.let { gestureFromIndex((it as Short).toInt(), classes) } ?: "UNKNOWN"
         // Main board extras after the model id: battery % (uint8), then thumb and index force (uint16)
         val batteryIndex = packet.data.indexOfFirst { it is UByte }
         _battery.value = (packet.data.getOrNull(batteryIndex) as? UByte)?.toInt()
@@ -362,9 +361,8 @@ class BluetoothViewModel @Inject constructor(
                 }
                 _deviceModelId.value = demoInstalledId
                 _battery.value = 87
-                // Fingers press on something while the simulated hand is closed
-                val pressing = (_activeLabel.value ?: gesture) == "CLOSE"
-                _grip.value = if (pressing) 2200 to 1800 else 40 to 30
+                // Like the rev2 board: no force sensors, so no grip pressure
+                _grip.value = null
                 onSample(reading.copy(gesture = gesture))
                 delay(1000L / DemoSimulator.RATE_HZ)
             }

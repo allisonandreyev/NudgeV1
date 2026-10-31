@@ -52,9 +52,11 @@ fun TrainAiScreen(
     val sync by bluetooth.modelSync.collectAsState()
     val status by bluetooth.deviceStatus.collectAsState()
     val online = status == DeviceStatus.Connected || status == DeviceStatus.Demo
+    // Gestures depend on the sensors: one MyoWare learns squeeze and relax
+    val channels = bluetooth.deviceChannels.collectAsState().value ?: DEFAULT_CHANNELS
     val recording = phase == TrainingPhase.COUNTDOWN || phase == TrainingPhase.PREPARE ||
         phase == TrainingPhase.HOLD || phase == TrainingPhase.BUILDING
-    val start = { viewModel.start(username, bluetooth.samples, bluetooth::setPromptedGesture) }
+    val start = { viewModel.start(username, channels, bluetooth.samples, bluetooth::setPromptedGesture) }
 
     DisposableEffect(Unit) {
         onDispose { bluetooth.setPromptedGesture(null) }
@@ -64,7 +66,8 @@ fun TrainAiScreen(
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (phase) {
                 TrainingPhase.INTRO -> IntroView(
-                    totalSeconds = viewModel.totalSeconds,
+                    gestures = TrainingViewModel.gesturesFor(channels),
+                    totalSeconds = viewModel.totalSeconds(channels),
                     rounds = viewModel.rounds,
                     online = online,
                     saved = saved,
@@ -94,6 +97,7 @@ fun TrainAiScreen(
 
 @Composable
 private fun IntroView(
+    gestures: List<String>,
     totalSeconds: Int,
     rounds: Int,
     online: Boolean,
@@ -121,7 +125,7 @@ private fun IntroView(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                IntroExplainer(totalSeconds, rounds)
+                IntroExplainer(gestures, totalSeconds, rounds)
             }
         }
         if (saved == null) {
@@ -130,7 +134,7 @@ private fun IntroView(
             // A quick check can't adapt a model to different sensors; only retraining helps
             PrimaryButton("Retrain for this wearable", icon = Icons.Default.PlayArrow, enabled = online, onClick = onStart)
         } else {
-            PrimaryButton("Quick check (15 s)", enabled = online, onClick = onCalibrate)
+            PrimaryButton("Quick check (${CalibrateViewModel.totalSeconds(CalibrateViewModel.stepsFor(saved.model))} s)", enabled = online, onClick = onCalibrate)
             Spacer(Modifier.height(10.dp))
             SecondaryButton("Retrain from scratch", enabled = online, onClick = onStart)
         }
@@ -139,7 +143,7 @@ private fun IntroView(
 }
 
 @Composable
-private fun IntroExplainer(totalSeconds: Int, rounds: Int) {
+private fun IntroExplainer(gestures: List<String>, totalSeconds: Int, rounds: Int) {
     Column {
         Text("Teach Nudge your hand", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(8.dp))
@@ -151,12 +155,8 @@ private fun IntroExplainer(totalSeconds: Int, rounds: Int) {
         Spacer(Modifier.height(24.dp))
         SectionLabel("Gestures")
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(
-                "REST" to "Let your hand go loose",
-                "OPEN" to "Spread your fingers wide",
-                "CLOSE" to "Make a firm fist",
-                "PINCH" to "Press thumb and index finger together"
-            ).forEach { (g, hint) ->
+            gestures.forEach { g ->
+                val hint = gestureHint(g)
                 NudgeCard(Modifier.fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(Modifier.size(10.dp), shape = MaterialTheme.shapes.extraLarge, color = gestureColor(g)) {}
@@ -177,6 +177,17 @@ private fun IntroExplainer(totalSeconds: Int, rounds: Int) {
         )
     }
 }
+
+private fun gestureHint(gesture: String) = when (gesture) {
+    "REST" -> "Let your hand go loose"
+    "OPEN" -> "Spread your fingers wide"
+    "CLOSE" -> "Make a firm fist"
+    "PINCH" -> "Press thumb and index finger together"
+    else -> ""
+}
+
+/** Sensor count assumed before the wearable's first reading arrives: the rev2 board's MyoWare. */
+private const val DEFAULT_CHANNELS = 1
 
 @Composable
 private fun CountdownView(viewModel: TrainingViewModel) {

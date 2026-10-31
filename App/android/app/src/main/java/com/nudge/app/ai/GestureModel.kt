@@ -21,7 +21,7 @@ object Features {
 
     /**
      * [window] holds WINDOW readings, oldest first, one value per channel. Works for any
-     * channel count: 3 for the original MyoWare sensors, 8 for the 16-pad ADS1298 strip.
+     * channel count: 1 for the MyoWare on the rev2 board, 8 for the 16-pad ADS1298 strip.
      */
     fun extract(window: List<FloatArray>): FloatArray {
         require(window.size == WINDOW)
@@ -105,9 +105,18 @@ class GestureModel(
     companion object {
         /** Gesture order used by the firmware's actuation logic: 0/2 close the hand, 1/3 open it. */
         val FIRMWARE_CLASSES = listOf("CLOSE", "OPEN", "PINCH", "REST")
+
+        /**
+         * Gestures for a single sensor, which can only tell a squeeze from relaxing.
+         * Relaxing opens the hand (index 1), so the firmware's actuation rule still holds.
+         */
+        val SQUEEZE_CLASSES = listOf("CLOSE", "REST")
+
+        /** Gestures a wearable with [channels] sensors is trained on, in firmware order. */
+        fun classesFor(channels: Int) = if (channels == 1) SQUEEZE_CLASSES else FIRMWARE_CLASSES
         private fun coreCount(channels: Int, classes: Int) = Features.count(channels) * 2 + classes * (Features.count(channels) + 1)
 
-        /** Parameters sent to the wearable: 64 for 3 channels, 164 for the 8-channel strip. */
+        /** Parameters sent to the wearable: 16 for one MyoWare (2 gestures), 164 for the 8-channel strip. */
         fun parameterCount(channels: Int, classes: Int = FIRMWARE_CLASSES.size) = channels * 2 + coreCount(channels, classes)
 
         fun fromParameters(params: FloatArray, classes: List<String> = FIRMWARE_CLASSES): GestureModel {

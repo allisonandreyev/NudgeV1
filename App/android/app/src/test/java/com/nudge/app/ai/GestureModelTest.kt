@@ -12,7 +12,7 @@ class GestureModelTest {
 
     /** Records [rounds] holds of each gesture from the demo simulator, like the Train AI screen does. */
     private fun simulatedRecordings(rounds: Int, seed: Int = 1): List<Recording> {
-        val sim = DemoSimulator(Random(seed))
+        val sim = DemoSimulator.strip(Random(seed))
         val out = mutableListOf<Recording>()
         for (r in 1..rounds) {
             for (g in listOf("REST", "OPEN", "CLOSE", "PINCH")) {
@@ -51,7 +51,7 @@ class GestureModelTest {
     @Test
     fun classifiesFreshDataFromTheSameUser() {
         val model = GestureTrainer.train(simulatedRecordings(rounds = 5, seed = 1)).model
-        val sim = DemoSimulator(Random(99))
+        val sim = DemoSimulator.strip(Random(99))
         for (g in listOf("REST", "OPEN", "CLOSE", "PINCH")) {
             repeat(100) { sim.next(g) }
             val window = List(Features.WINDOW) { sim.next(g).values }
@@ -93,7 +93,7 @@ class ChannelCountTest {
 class ModelProtocolTest {
     @Test
     fun linesFitInOneBluetoothWrite() {
-        val sim = DemoSimulator(Random(3))
+        val sim = DemoSimulator.strip(Random(3))
         val recs = (1..2).flatMap { r -> listOf("REST", "OPEN", "CLOSE", "PINCH").map { g -> Recording(r, g, List(60) { sim.next(g).values }) } }
         val cmds = ModelProtocol.uploadCommands(GestureTrainer.train(recs).model, id = 4242)
         assertTrue(cmds.first().startsWith("mdl_begin 4242 ${GestureModel.parameterCount(8)}"))
@@ -104,21 +104,20 @@ class ModelProtocolTest {
     /**
      * Writes a fixture for the firmware cross-check in Software/Nudge_Firmware/test:
      * the upload commands, a stream of readings, and what the app's model predicts for each window.
+     * Matches the rev2 firmware: one MyoWare, squeeze and relax.
      */
     @Test
     fun writeFirmwareFixture() {
         val sim = DemoSimulator(Random(7))
-        val recs = (1..4).flatMap { r -> listOf("REST", "OPEN", "CLOSE", "PINCH").map { g -> Recording(r, g, List(120) { sim.next(g).values }) } }
+        val classes = GestureModel.classesFor(1)
+        val recs = (1..4).flatMap { r -> listOf("REST", "CLOSE").map { g -> Recording(r, g, List(120) { sim.next(g).values }) } }
         // Include a recalibration so the firmware's per-sensor correction is exercised too
-        val model = GestureTrainer.train(recs).model
-            .withCalibration(
-                floatArrayOf(0.8f, 1.3f, 1.1f, 0.9f, 1.2f, 1.0f, 0.7f, 1.4f),
-                floatArrayOf(1f, -0.5f, 2f, 0f, 0.5f, -1f, 1.5f, 0f)
-            )
+        val model = GestureTrainer.train(recs, classes).model.withCalibration(floatArrayOf(0.8f), floatArrayOf(15f))
         val out = StringBuilder()
         ModelProtocol.uploadCommands(model, id = 777).forEach { out.append("CMD ").append(it).append('\n') }
         val readings = mutableListOf<FloatArray>()
-        for (g in listOf("REST", "OPEN", "CLOSE", "PINCH", "OPEN")) repeat(40) { readings += sim.next(g).values }
+        // Partial efforts too, so some windows sit near the boundary
+        for (g in listOf("REST", "CLOSE", "PINCH", "REST", "OPEN", "CLOSE")) repeat(40) { readings += sim.next(g).values }
         readings.forEachIndexed { i, v ->
             out.append("READ ").append(v.joinToString(" "))
             if (i >= Features.WINDOW - 1) {
@@ -167,7 +166,7 @@ class CalibrationTest {
         return Calibration.compute(model, reference, rest, fist, open)
     }
 
-    private val trained by lazy { GestureTrainer.train(record(DemoSimulator(Random(1)), rounds = 5)) }
+    private val trained by lazy { GestureTrainer.train(record(DemoSimulator.strip(Random(1)), rounds = 5)) }
 
     // Strip re-fitted badly: flexor-side channels read ~30%, extensor-side ~240%, so a fist
     // starts to look like an open hand. Milder shifts don't confuse 8 channels at all.
@@ -192,10 +191,10 @@ class CalibrationTest {
 
     @Test
     fun samePlacementNeedsNoCorrection() {
-        val result = quickCheck(trained.model, trained.reference, DemoSimulator(Random(5)))
+        val result = quickCheck(trained.model, trained.reference, DemoSimulator.strip(Random(5)))
         result.model.gain.forEach { assertEquals(1f, it, 0.2f) }
         assertTrue(result.sensors.all { it == SensorState.Normal })
-        assertTrue(accuracy(result.model, DemoSimulator(Random(6))) > 0.9f)
+        assertTrue(accuracy(result.model, DemoSimulator.strip(Random(6))) > 0.9f)
     }
 
     @Test
@@ -211,5 +210,67 @@ class CalibrationTest {
         val copy = GestureModel.fromParameters(result.model.toParameters())
         assertArrayEquals(result.model.gain, copy.gain, 0f)
         assertArrayEquals(result.model.offset, copy.offset, 0f)
+    }
+}
+
+/** The rev2 board: one MyoWare sensor, trained on squeeze and relax only. */
+class SingleSensorTest {
+    private val classes = GestureModel.classesFor(1)
+
+    private fun record(sim: DemoSimulator, rounds: Int): List<Recording> = (1..rounds).flatMap { r ->
+        listOf("REST", "CLOSE").map { g ->
+            repeat(75) { sim.next(g) }
+            Recording(r, g, List(150) { sim.next(g).values })
+        }
+    }
+
+    private fun accuracy(model: GestureModel, sim: DemoSimulator): Float {
+        var correct = 0
+        var total = 0
+        for (round in 1..3) for (g in listOf("REST", "CLOSE")) {
+            repeat(75) { sim.next(g) }
+            val readings = List(100) { sim.next(g).values }
+            for (i in 0..readings.size - Features.WINDOW step 5) {
+                total++
+                if (model.classes[model.predictWindow(readings.subList(i, i + Features.WINDOW)).first] == g) correct++
+            }
+        }
+        return correct.toFloat() / total
+    }
+
+    private val trained by lazy { GestureTrainer.train(record(DemoSimulator(Random(1)), rounds = 5), classes) }
+
+    @Test
+    fun learnsSqueezeAndRelax() {
+        assertEquals(listOf("CLOSE", "REST"), classes)
+        assertTrue("accuracy was ${trained.accuracy}", trained.accuracy!! > 0.95f)
+        assertEquals(16, trained.model.toParameters().size)
+        assertEquals(GestureModel.parameterCount(1, 2), trained.model.toParameters().size)
+        val copy = GestureModel.fromParameters(trained.model.toParameters(), classes)
+        assertEquals(1, copy.channels)
+    }
+
+    @Test
+    fun relaxingOpensTheHand() {
+        // The firmware opens the hand for index 1 and 3, closes it for 0 and 2
+        assertEquals(1, classes.indexOf("REST"))
+        assertEquals("REST", com.nudge.app.bluetooth.gestureFromIndex(1, classes))
+        assertEquals("UNKNOWN", com.nudge.app.bluetooth.gestureFromIndex(2, classes))
+    }
+
+    @Test
+    fun quickCheckWithoutOpenRestoresAWeakerSensor() {
+        // Sensor re-fitted with poorer contact: 40% of the signal
+        fun weaker(seed: Int) = DemoSimulator(Random(seed), floatArrayOf(0.4f), floatArrayOf(10f))
+        val sim = weaker(11)
+        repeat(50) { sim.next("REST") }
+        val rest = List(200) { sim.next("REST").values }
+        repeat(50) { sim.next("CLOSE") }
+        val fist = List(150) { sim.next("CLOSE").values }
+        val result = Calibration.compute(trained.model, trained.reference, rest, fist, emptyList())
+        assertEquals(setOf("REST", "CLOSE"), result.recognised.keys)
+        assertTrue(result.allRecognised)
+        assertEquals(SensorState.Weaker, result.sensors[0])
+        assertTrue(accuracy(result.model, weaker(12)) > 0.9f)
     }
 }

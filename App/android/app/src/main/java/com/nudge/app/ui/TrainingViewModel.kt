@@ -2,6 +2,7 @@ package com.nudge.app.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nudge.app.ai.GestureModel
 import com.nudge.app.ai.GestureTrainer
 import com.nudge.app.ai.ModelRepository
 import com.nudge.app.ai.Recording
@@ -32,7 +33,10 @@ class TrainingViewModel @Inject constructor(
     private val models: ModelRepository
 ) : ViewModel() {
 
-    val gestures = listOf("REST", "OPEN", "CLOSE", "PINCH")
+    /** Gestures in the order they're prompted, for the wearable being recorded. Set by [start]. */
+    var gestures = gesturesFor(1)
+        private set
+    private var classes = GestureModel.classesFor(1)
     val rounds = 5
 
     private val _phase = MutableStateFlow(TrainingPhase.INTRO)
@@ -70,10 +74,13 @@ class TrainingViewModel @Inject constructor(
     private var collector: Job? = null
     @Volatile private var recordingLabel: String? = null
 
-    val totalSeconds: Int get() = ((PREPARE_MS + HOLD_MS) * gestures.size * rounds / 1000).toInt()
+    /** How long recording takes for a wearable with [channels] sensors. */
+    fun totalSeconds(channels: Int): Int = ((PREPARE_MS + HOLD_MS) * gesturesFor(channels).size * rounds / 1000).toInt()
 
-    fun start(username: String, readings: Flow<EmgSample>, onPrompt: (String?) -> Unit) {
+    fun start(username: String, channels: Int, readings: Flow<EmgSample>, onPrompt: (String?) -> Unit) {
         this.username = username
+        gestures = gesturesFor(channels)
+        classes = GestureModel.classesFor(channels)
         _result.value = null
         _saved.value = false
         job?.cancel()
@@ -125,7 +132,7 @@ class TrainingViewModel @Inject constructor(
         _phase.value = TrainingPhase.BUILDING
         val started = System.currentTimeMillis()
         val result = try {
-            withContext(Dispatchers.Default) { GestureTrainer.train(recordings()) }
+            withContext(Dispatchers.Default) { GestureTrainer.train(recordings(), classes) }
         } catch (e: Exception) {
             null
         }
@@ -183,6 +190,11 @@ class TrainingViewModel @Inject constructor(
     }
 
     companion object {
+        private val PROMPT_ORDER = listOf("REST", "OPEN", "CLOSE", "PINCH")
+
+        /** One sensor learns squeeze and relax; several learn all four gestures. */
+        fun gesturesFor(channels: Int): List<String> = GestureModel.classesFor(channels).let { c -> PROMPT_ORDER.filter { it in c } }
+
         const val PREPARE_MS = 1500L
         const val HOLD_MS = 3000L
         private const val TICK_MS = 50L

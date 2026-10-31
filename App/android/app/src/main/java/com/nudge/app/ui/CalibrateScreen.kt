@@ -74,7 +74,7 @@ fun CalibrateScreen(
                             Spacer(Modifier.height(16.dp))
                         }
                     } else {
-                        IntroView(viewModel.totalSeconds, online, onConnect) {
+                        IntroView(CalibrateViewModel.stepsFor(model.model), online, onConnect) {
                             viewModel.start(username, model, bluetooth.samples, bluetooth::setPromptedGesture)
                         }
                     }
@@ -98,7 +98,8 @@ fun CalibrateScreen(
 }
 
 @Composable
-private fun IntroView(seconds: Int, online: Boolean, onConnect: () -> Unit, onStart: () -> Unit) {
+private fun IntroView(steps: List<CalibrateStep>, online: Boolean, onConnect: () -> Unit, onStart: () -> Unit) {
+    val seconds = CalibrateViewModel.totalSeconds(steps)
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             if (!online) {
@@ -115,7 +116,7 @@ private fun IntroView(seconds: Int, online: Boolean, onConnect: () -> Unit, onSt
             Spacer(Modifier.height(24.dp))
             SectionLabel("You'll do")
             NudgeCard(Modifier.fillMaxWidth()) {
-                listOf("REST" to "4 s", "CLOSE" to "3 s", "OPEN" to "3 s").forEachIndexed { i, (g, time) ->
+                steps.map { it.gesture to "${it.holdMs / 1000} s" }.forEachIndexed { i, (g, time) ->
                     if (i > 0) Spacer(Modifier.height(12.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(Modifier.size(10.dp), shape = CircleShape, color = gestureColor(g)) {}

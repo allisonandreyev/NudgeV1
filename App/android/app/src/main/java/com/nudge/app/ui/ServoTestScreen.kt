@@ -23,9 +23,12 @@ import com.nudge.app.ui.theme.NudgeTheme
 /** Firmware stops closing when either finger sensor reads above this (GRIP_LIMIT in MotorController.cpp). */
 private const val GRIP_LIMIT = 2500
 
+/** Motors on the board: the rev2 board drives one (BoardConfig.h MOTOR_COUNT). */
+private const val MOTOR_COUNT = 1
+
 /**
- * Manual control of the main board's two motors, for setup and troubleshooting,
- * with the live EMG channels, grip pressure and battery alongside.
+ * Manual control of the hand's motor, for setup and troubleshooting, with the live EMG,
+ * battery and (on boards that have force sensors) grip pressure alongside.
  */
 @Composable
 fun ServoTestScreen(
@@ -39,7 +42,7 @@ fun ServoTestScreen(
     val battery by bluetooth.battery.collectAsState()
     val online = status == DeviceStatus.Connected || status == DeviceStatus.Demo
     var speed by remember { mutableFloatStateOf(150f) }
-    val positions = remember { mutableStateListOf(0f, 0f) }
+    val positions = remember { List(MOTOR_COUNT) { 0f }.toMutableStateList() }
     var showAdvanced by remember { mutableStateOf(false) }
 
     NudgeScreen(
@@ -138,7 +141,7 @@ fun ServoTestScreen(
                     positions.forEachIndexed { index, position ->
                         NudgeCard(Modifier.fillMaxWidth()) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Motor ${index + 1}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                                Text(if (MOTOR_COUNT == 1) "Hand position" else "Motor ${index + 1}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                                 Text("${position.toInt()}% closed", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                             }
                             Slider(
@@ -155,8 +158,8 @@ fun ServoTestScreen(
                     }
                     ActionRow(
                         icon = Icons.Default.Straighten,
-                        title = "Calibrate motors",
-                        subtitle = "Opens fully, closes until each motor stops, then opens again to learn its range",
+                        title = if (MOTOR_COUNT == 1) "Calibrate motor" else "Calibrate motors",
+                        subtitle = "Start with the hand open and empty. It closes until the motor stops, then opens again to learn its range",
                         onClick = { bluetooth.sendCommand("calibrate") }
                     )
                 }

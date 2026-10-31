@@ -368,11 +368,14 @@ fun GestureReadout(gesture: String, modifier: Modifier = Modifier) {
 fun channelColor(index: Int): Color = NudgeTheme.colors.channels.let { it[index % it.size] }
 
 /**
- * Name for a channel. On the 8-channel strip each channel is a pair of neighbouring pads:
- * channel 1 is pads 16 (+) and 15 (-), down to channel 8 on pads 2 and 1.
+ * Name for a channel. A single channel is the rev2 board's MyoWare. On the 8-channel strip each
+ * channel is a pair of neighbouring pads: channel 1 is pads 16 (+) and 15 (-), down to channel 8 on pads 2 and 1.
  */
-fun channelName(index: Int, total: Int): String =
-    if (total == 8) "Ch ${index + 1} (${16 - 2 * index}/${15 - 2 * index})" else "Sensor ${index + 1}"
+fun channelName(index: Int, total: Int): String = when (total) {
+    1 -> "Muscle sensor"
+    8 -> "Ch ${index + 1} (${16 - 2 * index}/${15 - 2 * index})"
+    else -> "Sensor ${index + 1}"
+}
 
 /**
  * Live EMG plot. Each list in [channels] is one channel's recent samples, oldest first.
