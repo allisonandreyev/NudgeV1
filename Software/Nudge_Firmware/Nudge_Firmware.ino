@@ -1,8 +1,8 @@
 /**
- * Nudge Wearable Firmware - main board (Nudge.kicad_sch) with a XIAO ESP32-S3
- * 16-pad EMG strip: TI ADS1298, 8 differential channels over SPI (see WIRING.md)
+ * Nudge Wearable Firmware - Nudge v2 rev2 board with a XIAO ESP32-S3
+ * EMG: one MyoWare 2.0 sensor on J2 (see MyoWare.h, WIRING.md)
  * On-device gesture model trained by the app (see GestureModel.h)
- * Two DC motors with encoders, force sensors and battery (see MotorController.h)
+ * DC motor with encoder winding the finger line, battery and status LED (see MotorController.h)
  * Pins: BoardConfig.h. Build for board XIAO_ESP32S3.
  * Using Custom Binary TLV Protocol
  */
@@ -14,7 +14,7 @@
 #include "BoardConfig.h"
 #include "MotorController.h"
 #include "GestureModel.h"
-#include "ADS1298.h"
+#include "MyoWare.h"
 
 // UUIDs - MUST MATCH ANDROID APP
 #define SERVICE_UUID        "000B1E53-D47A-CEDE-DE57-000000008488"
@@ -45,7 +45,7 @@ void handleCommand(String value) {
     value.trim();
     if (value.length() == 0) return;
     if (GestureModel::HandleCommand(value)) return;
-    if (ADS1298::HandleCommand(value)) return;
+    if (MyoWare::HandleCommand(value)) return;
     Serial.print("Command Received: ");
     Serial.println(value);
     if (!MotorController::ParseCommand(value)) Serial.println("Unknown command");
@@ -72,17 +72,22 @@ class MyCallbacks: public BLECharacteristicCallbacks {
 };
 
 void setup() {
+    // Motor driver asleep before anything else, so the motor can't run by accident
+    pinMode(Board::PIN_MOTOR_EN, OUTPUT);
+    digitalWrite(Board::PIN_MOTOR_EN, LOW);
+    // One blink: powered up
+    pinMode(Board::PIN_LED, OUTPUT);
+    digitalWrite(Board::PIN_LED, LOW);
+    delay(200);
+    digitalWrite(Board::PIN_LED, HIGH);
+
     Serial.begin(115200);
     GestureModel::Init();
-
-    // Safe start: opens the hand gently until each motor reaches its end stop
     MotorController::Init();
-
-    sensorReady = ADS1298::Begin();
-    if (!sensorReady) Serial.println(">> EMG strip not working; motors and BLE still run. See WIRING.md.");
+    sensorReady = MyoWare::Begin();
 
     BLEDevice::init("Nudge");
-    // Room for 8-channel packets and model upload lines
+    // Room for model upload lines
     BLEDevice::setMTU(247);
     pServer = BLEDevice::createServer();
     pServer->setCallbacks(new MyServerCallbacks());
@@ -104,7 +109,7 @@ void setup() {
     pService->start();
     BLEDevice::getAdvertising()->addServiceUUID(SERVICE_UUID);
     pServer->getAdvertising()->start();
-    Serial.println(">> Nudge Ready (EMG strip + Motors + Gesture Model). Try 'status' or 'ads diag on'.");
+    Serial.println(">> Nudge Ready (MyoWare + Motor + Gesture Model). Try 'status' or 'emg diag on'.");
 }
 
 void updateGesture() {
@@ -126,8 +131,10 @@ void updateGesture() {
 
     /**
      * GATED AI ACTUATION
-     * Only move servos if explicitly enabled by "ai_start" command, and only when the
+     * Only move the hand if explicitly enabled by "ai_start" command, and only when the
      * gesture changes. UNKNOWN (-1) holds the current position.
+     * Two-gesture models (one sensor) are CLOSE=0, REST=1; four-gesture models are
+     * CLOSE=0, OPEN=1, PINCH=2, REST=3.
      */
     if (!MotorController::IsAIActuationEnabled()) {
         actuatedClassification = -1;
@@ -145,15 +152,18 @@ void updateGesture() {
     }
 }
 
-void sendPacket(const float envelope[ADS1298::CHANNELS]) {
-    // EMG floats, gesture, model id, then battery % and the two force sensors
-    constexpr int SIZE = 6 + ADS1298::CHANNELS * 8 + 6 + 6 + 5 + 6 + 6;
+// Boards without force sensors leave them out of the packet, and the app hides grip pressure
+constexpr bool HAS_FORCE_SENSORS = Board::PIN_FSR_THUMB >= 0 || Board::PIN_FSR_INDEX >= 0;
+
+void sendPacket(const float envelope[MyoWare::CHANNELS]) {
+    // EMG floats, gesture, model id, then battery % and (if fitted) the two force sensors
+    constexpr int SIZE = 6 + MyoWare::CHANNELS * 8 + 6 + 6 + 5 + (HAS_FORCE_SENSORS ? 12 : 0);
     uint8_t packet[SIZE];
     packet[0] = 0x01; packet[1] = 0x00; packet[2] = messageId++;
     packet[3] = 0x10; packet[4] = 0x00; packet[5] = SIZE - 6;
 
     int offset = 6;
-    for (int i = 0; i < ADS1298::CHANNELS; i++) {
+    for (int i = 0; i < MyoWare::CHANNELS; i++) {
         packet[offset++] = (TYPE_FLOAT >> 8) & 0xFF; packet[offset++] = TYPE_FLOAT & 0xFF;
         packet[offset++] = 0x00; packet[offset++] = 0x04;
         memcpy(&packet[offset], &envelope[i], 4); offset += 4;
@@ -174,6 +184,7 @@ void sendPacket(const float envelope[ADS1298::CHANNELS]) {
 
     uint16_t forces[] = {MotorController::ForceThumb(), MotorController::ForceIndex()};
     for (uint16_t f : forces) {
+        if (!HAS_FORCE_SENSORS) break;
         packet[offset++] = (TYPE_UINT16 >> 8) & 0xFF; packet[offset++] = TYPE_UINT16 & 0xFF;
         packet[offset++] = 0x00; packet[offset++] = 0x02;
         memcpy(&packet[offset], &f, 2); offset += 2;
@@ -184,13 +195,13 @@ void sendPacket(const float envelope[ADS1298::CHANNELS]) {
 }
 
 void loop() {
-    // Serial commands, e.g. "ads mode shorted" during bring-up
+    // Serial commands, e.g. "emg diag on" during bring-up
     if (Serial.available()) handleCommand(Serial.readStringUntil('\n'));
-    ADS1298::PrintDiagnostics();
+    MyoWare::PrintDiagnostics();
 
-    // One envelope frame every 20 ms: 8 channels of muscle activity in microvolts
-    float envelope[ADS1298::CHANNELS];
-    if (!sensorReady || !ADS1298::NextEnvelope(envelope, 50)) return;
+    // One envelope frame every 20 ms: muscle activity in millivolts
+    float envelope[MyoWare::CHANNELS];
+    if (!sensorReady || !MyoWare::NextEnvelope(envelope, 50)) return;
 
     GestureModel::Push(envelope);
     updateGesture();

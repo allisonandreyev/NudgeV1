@@ -10,12 +10,13 @@ namespace GestureModel
         struct Model
         {
             uint16_t id;
-            float p[PARAMS];
+            uint8_t classes;
+            float p[MAX_PARAMS];
         };
 
-        Model active = {0, {0}};
-        Model staging = {0, {0}};
-        bool received[PARAMS];
+        Model active = {0, 0, {0}};
+        Model staging = {0, 0, {0}};
+        bool received[MAX_PARAMS];
         SemaphoreHandle_t lock = nullptr;
 
         float window[WINDOW][CHANNELS];
@@ -80,12 +81,16 @@ namespace GestureModel
         {
             unsigned id = 0;
             int count = 0;
-            if (sscanf(s, "mdl_begin %u %d", &id, &count) != 2 || count != PARAMS || id == 0)
+            bool parsed = sscanf(s, "mdl_begin %u %d", &id, &count) == 2;
+            int classes = count == ParamCount(2) ? 2 : count == ParamCount(4) ? 4 : 0;
+            if (!parsed || id == 0 || classes == 0)
             {
-                Serial.printf("Model upload rejected: expected %d parameters\n", PARAMS);
+                Serial.printf("Model upload rejected: expected %d or %d parameters for %d sensor(s)\n",
+                              ParamCount(2), ParamCount(4), CHANNELS);
                 return true;
             }
             staging.id = (uint16_t)id;
+            staging.classes = (uint8_t)classes;
             memset(received, 0, sizeof(received));
             return true;
         }
@@ -94,7 +99,13 @@ namespace GestureModel
         {
             float checksum = strtof(s + 7, nullptr);
             float sum = 0;
-            for (int i = 0; i < PARAMS; i++)
+            int params = ParamCount(staging.classes);
+            if (params == ParamCount(0))
+            {
+                Serial.println("Model upload incomplete: no mdl_begin");
+                return true;
+            }
+            for (int i = 0; i < params; i++)
             {
                 if (!received[i])
                 {
@@ -129,7 +140,7 @@ namespace GestureModel
         // mdl <offset> <values...>
         char* end;
         long offset = strtol(s + 3, &end, 10);
-        for (int i = offset; i < PARAMS; i++)
+        for (int i = offset; i < MAX_PARAMS; i++)
         {
             char* next;
             float v = strtof(end, &next);
@@ -167,7 +178,7 @@ namespace GestureModel
         xSemaphoreTake(lock, portMAX_DELAY);
         m = active;
         xSemaphoreGive(lock);
-        if (m.id == 0) return false;
+        if (m.id == 0 || m.classes == 0) return false;
 
         float f[FEATURES];
         Features(f);
@@ -175,11 +186,11 @@ namespace GestureModel
         const float* mean = m.p + 2 * CHANNELS;
         const float* scale = mean + FEATURES;
         const float* weights = scale + FEATURES;
-        const float* bias = weights + CLASSES * FEATURES;
+        const float* bias = weights + m.classes * FEATURES;
 
-        float scores[CLASSES];
+        float scores[MAX_CLASSES];
         int best = 0;
-        for (int k = 0; k < CLASSES; k++)
+        for (int k = 0; k < m.classes; k++)
         {
             float s = bias[k];
             for (int i = 0; i < FEATURES; i++) s += weights[k * FEATURES + i] * (f[i] - mean[i]) / scale[i];
@@ -187,7 +198,7 @@ namespace GestureModel
             if (s > scores[best]) best = k;
         }
         float total = 0;
-        for (int k = 0; k < CLASSES; k++) total += expf(scores[k] - scores[best]);
+        for (int k = 0; k < m.classes; k++) total += expf(scores[k] - scores[best]);
 
         gesture = best;
         probability = 1.0f / total;

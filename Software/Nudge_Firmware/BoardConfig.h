@@ -2,64 +2,48 @@
 #include <Arduino.h>
 
 /**
- * Wiring of the Nudge main board (Nudge.kicad_sch, Oct 11) with a Seeed XIAO ESP32-S3,
- * plus the 16-pad EMG strip (NudgeFlexStrip). Everything board-specific lives here.
+ * Wiring of the Nudge v2 rev2 board (Hardware/KiCad/NudgeV2Rev2) with a Seeed XIAO ESP32-S3
+ * and a MyoWare 2.0 muscle sensor. Everything board-specific lives here.
  * Build with board "XIAO_ESP32S3" (esp32:esp32:XIAO_ESP32S3).
  */
 namespace Board
 {
-    // --- Motors: Adafruit DRV8833 (U2), powered from the 9 V boost (U3) -------------------
-    constexpr int MOTOR_COUNT = 2;
-    constexpr int PIN_MOTOR_EN = D6;                   // DRV8833 SLP; R7 pulls it low (asleep) by default
-    constexpr int PIN_MOTOR_IN1[MOTOR_COUNT] = {D4, D8};  // AIN1, BIN1
-    constexpr int PIN_MOTOR_IN2[MOTOR_COUNT] = {D5, D9};  // AIN2, BIN2
+    // --- Motor: DRV8833 (U2) motor A, powered from the 9 V boost (U3) ----------------------
+    // Motor B (D8/D9, J6) is on the board but not fitted.
+    constexpr int MOTOR_COUNT = 1;
+    constexpr int PIN_MOTOR_EN = D6;                   // DRV8833 SLEEP; R7 pulls it low (asleep)
+    constexpr int PIN_MOTOR_IN1[MOTOR_COUNT] = {D4};   // AIN1
+    constexpr int PIN_MOTOR_IN2[MOTOR_COUNT] = {D5};   // AIN2
 
-    // Encoders: only channel A of each motor is wired (J5/J6 pin 5; pin 6 is unconnected),
-    // so the firmware counts pulses and takes direction from the drive command.
-    // -1 = no encoder: moves are timed instead.
-    // Strip on the bottom pads (default) keeps both encoders; the bench option borrows them.
+    // Encoder channel A only (J5 pin 5, 10k pull-up R5), so direction comes from the drive
+    // command. -1 = no encoder: moves are timed instead.
+    constexpr int PIN_ENCODER[MOTOR_COUNT] = {D7};
 
-    // Which way each motor turns to close the hand: +1 or -1. Flip if a motor runs backwards.
-    constexpr int CLOSE_DIRECTION[MOTOR_COUNT] = {+1, +1};
+    // Which way the motor turns to wind the line in (close the hand): +1 or -1.
+    constexpr int CLOSE_DIRECTION[MOTOR_COUNT] = {+1};
+
+    // The motor winds a line on a spool and elastic cords open the hand, so there's no end
+    // stop when opening: the hand is assumed open at power-up and "open" means back to count 0.
+    // Closing ends at the target or when the motor stalls (hand closed or holding something).
+    constexpr bool OPEN_END_STOP = false;
+    constexpr uint32_t MOVE_TIMEOUT_MS = 2000;  // stop any single move after this long
+    constexpr uint32_t STALL_MS = 150;          // no encoder pulses for this long while driving = stalled
+
+    // --- EMG: MyoWare 2.0 on J2 (pin 1 3V3, 2 GND, 3 ENV) ----------------------------------
+    constexpr int EMG_CHANNELS = 1;
+    constexpr int PIN_EMG = D0;          // ENV output, 0 V relaxed, rising with effort (ADC1)
 
     // --- Sensors ------------------------------------------------------------------------
     constexpr int PIN_BATTERY = D3;      // VBAT through a 100k/100k divider (R3/R4)
     constexpr float BATTERY_DIVIDER = 2.0f;
+    constexpr float BATTERY_EMPTY_V = 3.3f;   // below this the motor is stopped
+    constexpr float BATTERY_LOW_V = 3.5f;     // below this the LED warns
+    constexpr float BATTERY_FULL_V = 4.2f;
 
-    // Force sensors to 3V3 with 10k pull-downs (R1/R2): more pressure, higher reading
-
-    // --- EMG strip (ADS1298 header J3 on the strip) ---------------------------------------
-    // Default: the revised main board (Hardware/KiCad/NudgePCB/Nudge), where J2 "EMG_Strip"
-    //   replaces the MyoWare connector and is wired to D0 and the XIAO's four bottom pads.
-    //   No features are lost.
-    //
-    // Bench option (boards built before the revision): borrows the force-sensor and encoder pins, so
-    //   unplug both force sensors and encoders; grip limiting is off and motors run on timers.
-    //
-    // Uncomment to use the bench option:
-    // #define STRIP_ON_BENCH_PINS
-#ifndef STRIP_ON_BENCH_PINS
-    constexpr int PIN_STRIP_SCLK = 39;   // MTCK pad
-    constexpr int PIN_STRIP_DIN = 40;    // MTDO pad (MOSI, into the ADS1298)
-    constexpr int PIN_STRIP_DOUT = 41;   // MTDI pad (MISO, out of the ADS1298)
-    constexpr int PIN_STRIP_CS = 42;     // MTMS pad
-    constexpr int PIN_STRIP_DRDY = D0;   // was the MyoWare EMG input
-    constexpr int PIN_ENCODER[MOTOR_COUNT] = {D7, D10};
-    constexpr int PIN_FSR_THUMB = D1;
-    constexpr int PIN_FSR_INDEX = D2;
-#else
-    constexpr int PIN_STRIP_SCLK = D1;   // FSR_THUMB pin (10k pull-down is fine for SCLK)
-    constexpr int PIN_STRIP_DIN = D2;    // FSR_INDEX pin
-    constexpr int PIN_STRIP_DOUT = D0;   // MyoWare EMG pin
-    constexpr int PIN_STRIP_CS = D10;    // M2 encoder pin (10k pull-up keeps CS idle high)
-    constexpr int PIN_STRIP_DRDY = D7;   // M1 encoder pin (10k pull-up)
-    constexpr int PIN_ENCODER[MOTOR_COUNT] = {-1, -1};
+    // Force sensors J3/J4 (D1/D2) are on the board but not used on rev2. -1 = not fitted.
     constexpr int PIN_FSR_THUMB = -1;
     constexpr int PIN_FSR_INDEX = -1;
-#endif
-    // Tie on the strip's J3 in both cases: START to GND, RESET/PWDN/CLKSEL to 3V3, CLK unconnected.
-    constexpr int PIN_STRIP_START = -1;
-    constexpr int PIN_STRIP_RESET = -1;
-    constexpr int PIN_STRIP_PWDN = -1;
-    constexpr int PIN_STRIP_CLKSEL = -1;
+
+    // --- Status LED: the XIAO's user LED, on when LOW ----------------------------------------
+    constexpr int PIN_LED = 21;
 }

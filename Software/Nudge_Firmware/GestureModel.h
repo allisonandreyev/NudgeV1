@@ -12,19 +12,24 @@
  * Features and scoring must match GestureModel.kt in the app.
  *
  * BLE commands (text, one per write):
- *   mdl_begin <id> <count>      start an upload, count must be PARAMS
+ *   mdl_begin <id> <count>      start an upload, count must be ParamCount(2) or ParamCount(4)
  *   mdl <offset> <v> <v> ...    parameter values starting at offset
  *   mdl_end <checksum>          sum of all values; installs and saves if it matches
  *   mdl_clear                   forget the model
  */
 namespace GestureModel
 {
-    constexpr int CHANNELS = 8;  // ADS1298 differential channels (16-pad strip)
+    constexpr int CHANNELS = 1;  // one MyoWare sensor (Board::EMG_CHANNELS)
     constexpr int WINDOW = 10;   // 200 ms of 50 Hz envelope frames
     constexpr int FEATURES = CHANNELS * 3;
-    constexpr int CLASSES = 4;  // CLOSE, OPEN, PINCH, REST
-    // gain[CHANNELS], offset[CHANNELS], mean[FEATURES], scale[FEATURES], weights[CLASSES][FEATURES], bias[CLASSES]
-    constexpr int PARAMS = CHANNELS * 2 + FEATURES * 2 + CLASSES * (FEATURES + 1);
+    // Gestures, in the order the app trains them:
+    //   4 = CLOSE, OPEN, PINCH, REST (several sensors)
+    //   2 = CLOSE, REST (one sensor can only tell a squeeze from relaxing)
+    // Index 0 and 2 close the hand, 1 and 3 open it.
+    constexpr int MAX_CLASSES = 4;
+    // gain[CHANNELS], offset[CHANNELS], mean[FEATURES], scale[FEATURES], weights[classes][FEATURES], bias[classes]
+    constexpr int ParamCount(int classes) { return CHANNELS * 2 + FEATURES * 2 + classes * (FEATURES + 1); }
+    constexpr int MAX_PARAMS = ParamCount(MAX_CLASSES);
 
     /** Load a saved model from flash. Call once in setup(). */
     void Init();

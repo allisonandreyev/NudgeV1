@@ -102,6 +102,32 @@ int main()
         CHECK(axis.Update(now + 10, plant.pulses, false) == 0, "still driving after stall");
     }
 
+    // Spool with elastic return (rev2): no end stop when opening, so homing doesn't drive
+    {
+        MotorAxisConfig cfg;
+        cfg.openEndStop = false;
+        MotorAxis axis(cfg);
+        Plant plant{0, 500};
+        axis.Home(0);
+        uint32_t now = Run(axis, plant, 0, 1000);
+        CHECK(axis.GetState() == MotorAxis::State::Idle && axis.Homed(), "spool homing didn't finish");
+        CHECK(plant.position == 0 && plant.pulses == 0, "spool homing moved the motor");
+
+        // Calibration: close until stall, learn the travel, open back to count 0
+        axis.FindTravel(now);
+        for (int i = 0; i < 4 && axis.GetState() != MotorAxis::State::Idle; i++) now = Run(axis, plant, now, 6000);
+        CHECK(std::abs(axis.TravelPulses() - 500) < 30, "spool learned travel %ld, real 500", axis.TravelPulses());
+        CHECK(plant.position < 30, "spool not reopened after calibration (%.0f)", plant.position);
+
+        // Close, then open by counting back
+        axis.MoveTo(1.0f, 1.0f, now);
+        now = Run(axis, plant, now, 4000);
+        CHECK(plant.position > 470, "spool closed only to %.0f of 500", plant.position);
+        axis.MoveTo(0.0f, 1.0f, now);
+        Run(axis, plant, now, 4000);
+        CHECK(plant.position < 20, "spool opened only to %.0f", plant.position);
+    }
+
     // No encoder: timed moves
     {
         MotorAxisConfig cfg;

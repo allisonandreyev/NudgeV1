@@ -1,22 +1,14 @@
 # Firmware checks on a computer
 
-## Frame decoding and EMG filter
-
-```
-clang++ -std=c++17 -I .. dsp_test.cpp -o dsp_test && ./dsp_test
-```
-
-Checks ADS1298 frame decoding (24-bit sign extension, status word) and that the filter
-removes drift and mains hum while passing the EMG band, at 250 and 500 SPS.
-
 ## Motor control
 
 ```
 clang++ -std=c++17 -I .. motor_test.cpp -o motor_test && ./motor_test
 ```
 
-Runs `MotorAxis` against a simulated motor with end stops: homing, learning the travel,
-moving to a position, stopping on a grip signal or a stall, and timed moves without an encoder.
+Runs `MotorAxis` against a simulated motor: homing against an end stop, learning the travel,
+moving to a position, stopping on a grip signal or a stall, timed moves without an encoder,
+and the rev2 spool (no end stop when opening: homing doesn't move, opening counts back to 0).
 
 ## Gesture model cross-check
 
@@ -29,7 +21,8 @@ classifies exactly like the app's `GestureModel.kt`. Runs on a computer; no boar
    ./gradlew testDebugUnitTest
    ```
 
-   This writes `App/android/app/build/firmware-fixture/fixture.txt`.
+   This writes `App/android/app/build/firmware-fixture/fixture.txt`: a one-sensor
+   (MyoWare) squeeze/relax model, like the rev2 firmware uses.
 
 2. Build and run the check (in this folder):
 

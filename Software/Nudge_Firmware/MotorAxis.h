@@ -7,6 +7,9 @@
  * No Arduino dependencies, so it can be tested on a computer (see test/).
  *
  * Position is a fraction of the calibrated travel: 0 = hand open, 1 = closed.
+ * If opening has a hard end stop, homing drives into it to find 0. If not (a spool with
+ * elastic opening the hand), the power-up position is taken as open and homing just
+ * returns to count 0.
  * A single-channel encoder only counts pulses, so direction comes from the drive command.
  * Without an encoder, position is estimated from drive time.
  *
@@ -16,6 +19,7 @@
 struct MotorAxisConfig
 {
     bool hasEncoder = true;
+    bool openEndStop = true;      // the hand stops against something when fully open
     long travelPulses = 600;      // pulses from fully open to fully closed (learned by Calibrate)
     uint32_t travelMs = 1500;     // full stroke time at full duty, used without an encoder
     float minDuty = 0.35f;        // below this the motor doesn't move
@@ -43,10 +47,10 @@ public:
         Begin(State::Moving, now);
     }
 
-    /** Open until the motor stalls against the end stop, then call that position 0. */
+    /** Open until the motor stalls against the end stop (or, without one, back to count 0); that's position 0. */
     void Home(uint32_t now) { Begin(State::Homing, now); }
 
-    /** Home, then close until stall to learn the full travel. Needs an encoder. */
+    /** Home, then close until stall to learn the full travel, then open again. Needs an encoder. */
     void FindTravel(uint32_t now)
     {
         findTravelAfterHoming = cfg.hasEncoder;
@@ -90,7 +94,10 @@ public:
         else if (state == State::Homing)
         {
             duty = -cfg.homingDuty;
-            if (Stalled(now) || (!cfg.hasEncoder && now - stateStart > cfg.travelMs + 200))
+            bool open = cfg.openEndStop
+                ? Stalled(now) || (!cfg.hasEncoder && now - stateStart > cfg.travelMs + 200)
+                : positionPulses <= 0 || Stalled(now);
+            if (open)
             {
                 positionPulses = 0;
                 homed = true;
