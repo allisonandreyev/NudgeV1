@@ -6,7 +6,11 @@ This directory contains the physical design files and electrical specifications 
 
 - CAD Models: 3D design files for the wearable chassis, electrode housings, and mechanical components.
 - Electrical Diagrams: an early EMG test schematic.
-- `KiCad/NudgePCB`: the current designs, from `Nudge Fall Internship.zip`:
+- `KiCad/NudgeV2Rev2`: **the board in use**, Nudge v2 rev2 (schematic, netlist, PDF, firmware
+  notes). XIAO ESP32-S3, one MyoWare 2.0 on J2, one DC motor with encoder on a DRV8833, USB-C
+  charging and a push-button power switch. No PCB layout file was included.
+- `KiCad/NudgePCB`: the 16-pad EMG strip designs, from `Nudge Fall Internship.zip`
+  (firmware for these is on the `16-pad-emg-strip` branch):
   - `Nudge`: main board. J2 is now the 12-pin EMG strip header (was the MyoWare connector).
     The PCB is an unrouted placement draft.
   - `NudgeEMGStrip`: the 16-pad EMG strip. C7 replaced by a 0 Ω jumper (R2) so VCAP3 gets 1 µF.
@@ -14,11 +18,14 @@ This directory contains the physical design files and electrical specifications 
 
 ## Component Specifications
 
-- Microcontroller: Seeed XIAO ESP32-S3 (main board)
-- EMG: 16-pad dry-electrode flex strip with a TI ADS1298 (8 differential channels, SPI) and a
-  right-leg-drive reference pad. Replaces the earlier three MyoWare 2.0 sensors.
-- Motors: two DC motors with single-channel encoders on an Adafruit DRV8833 driver, from a 9 V boost
-- Sensors: thumb and index force sensors, battery voltage
+Rev2 board:
+
+- Microcontroller: Seeed XIAO ESP32-S3
+- EMG: one MyoWare 2.0 muscle sensor (analog envelope output)
+- Motor: one N20 DC gear motor with a single-channel hall encoder, winding a line on a spool;
+  elastic cords open the hand. DRV8833 driver with about 1 A current limit, from a 9 V boost
+- Power: 1S LiPo, MCP73831 USB-C charger, MAX16054 push-button on/off
+- Sensors: battery voltage (force-sensor connectors are fitted but unused)
 - Communication: Bluetooth Low Energy (BLE)
 
 Pin-by-pin wiring, the strip's pad map, and known schematic issues: `Software/Nudge_Firmware/WIRING.md`.
