@@ -1,0 +1,77 @@
+NUDGE V2 BOARD - FIRMWARE NOTES
+
+WHAT IT IS
+EMG-controlled assist glove. Squeeze forearm muscle -> motor winds line -> fingers close.
+Relax -> motor unwinds -> elastic cords on back of fingers open the hand.
+
+MCU: Seeed XIAO ESP32S3 (on headers). Arduino IDE, board "XIAO_ESP32S3".
+
+PIN MAP (Arduino name / ESP32 GPIO)
+D0  / GPIO1   EMG input (MyoWare 2 ENV output, analog, ADC1)
+D1  / GPIO2   FSR_THUMB (J3) - NOT USED
+D2  / GPIO3   FSR_INDEX (J4) - NOT USED
+D3  / GPIO4   VBAT_SENSE (100k/100k divider: battery V = pin V x 2)
+D4  / GPIO5   M1_IN1 (DRV8833)
+D5  / GPIO6   M1_IN2 (DRV8833)
+D6  / GPIO43  MOTOR_EN (DRV8833 enable / sleep)
+D7  / GPIO44  M1_ENC_A (encoder channel A only, J5)
+D8  / GPIO7   M2_IN1 - NOT USED (only 1 motor)
+D9  / GPIO8   M2_IN2 - NOT USED
+D10 / GPIO9   M2_ENC_A - NOT USED
+LED_BUILTIN (GPIO21)  status LED, ON when LOW
+
+PIN NOTES
+- D6/D7 are also the hardware UART TX/RX. Use USB Serial for debug, not Serial0/Serial1 on those pins.
+- D0 and D3 are on ADC1, so they still work with WiFi/BLE on.
+- Only encoder channel A is wired, so the encoder can't tell direction.
+  Use the direction you are driving the motor to know if counts go up or down.
+
+MOTOR DRIVER (DRV8833)
+- D6 HIGH = driver on. Set D6 LOW first thing in setup() so the motor can't run by accident.
+- IN1 PWM + IN2 LOW = one direction. IN1 LOW + IN2 PWM = other direction.
+- Both LOW = coast. Both HIGH = brake.
+- Current limit ~1 A (0.2 ohm sense resistors).
+- Motor supply is 9 V from a boost converter. The boost is always on when the power switch is on.
+
+MOTOR (fill in from the motor listing)
+Model: N20 gear motor with magnetic (hall) encoder
+Rated voltage: ____ V (board drives it at ~9 V)
+Gear ratio: ____ : 1
+Output speed: ____ RPM
+Encoder pulses per MOTOR turn (one channel): ____ (often 7 on N20s, check listing)
+Pulses per OUTPUT shaft turn = pulses per motor turn x gear ratio = ____
+Spool diameter: ____ mm
+
+MECHANICS (estimates)
+- Full close needs ~50 mm of line pulled in.
+- Spool turns for full close = 50 / (pi x spool diameter).
+- Pull needed ~37 N total (~9 N per finger).
+
+EMG (MyoWare 2.0)
+- ENV pin = smoothed muscle signal, 0 V at rest, rises when muscle squeezes.
+- Powered from 3.3 V, so the reading stays under 3.3 V.
+- Read with analogRead (12-bit, 0-4095). Add light extra smoothing in code.
+- Levels change per person and per pad placement, so it needs calibration.
+
+BATTERY
+- 1S LiPo, 3.0-4.2 V. Charges over USB-C (MCP73831, 4.20 V, 500 mA).
+- Below 3.5 V: warning blink. Below 3.3 V: stop motor, slow blink.
+- ADC reading on ESP32 is a bit off. Use analogReadMilliVolts(), then x 2.
+
+WHAT THE CODE SHOULD DO
+1. Startup: D6 LOW, motor off, LED blink once.
+2. Calibrate: record rest EMG level and squeeze EMG level (button or USB command).
+3. Threshold with hysteresis: close above ~60% of squeeze, open below ~30%.
+   Require the signal to stay above the threshold ~100-200 ms so it doesn't twitch.
+4. Close: drive motor, count encoder pulses.
+5. Stall detect: if motor is powered but pulses stop or slow a lot for ~100-200 ms,
+   cut power (hand fully closed or blocked). Then hold or brake.
+6. Open: reverse until encoder count is back to 0 (or a short timed reverse).
+7. Safety: max run time per move (e.g. 2 s), then stop no matter what.
+8. Battery check every few seconds.
+9. Optional: USB Serial printing of EMG, encoder count and battery for tuning.
+
+LINKS TO LOOK UP
+- DRV8833 datasheet (TI)
+- MyoWare 2.0 Muscle Sensor hookup guide (SparkFun DEV-27924)
+- Seeed XIAO ESP32S3 wiki (pinout)
